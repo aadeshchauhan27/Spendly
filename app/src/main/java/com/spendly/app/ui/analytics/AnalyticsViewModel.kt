@@ -1,0 +1,203 @@
+package com.spendly.app.ui.analytics
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import com.spendly.app.data.repository.SpendlyRepository
+import com.spendly.app.domain.engine.FinancialInsight
+import com.spendly.app.domain.engine.InsightsEngine
+import com.spendly.app.domain.model.Transaction
+import com.spendly.app.domain.model.TransactionStatus
+import com.spendly.app.domain.model.TransactionType
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.stateIn
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+
+data class CategorySpendBreakdown(
+    val categoryName: String,
+    val colorHex: String,
+    val amountPaise: Long,
+    val percentage: Int,
+    val transactions: List<Transaction> = emptyList()
+) {
+    val formattedRupees: String
+        get() = (amountPaise / 100).toString()
+}
+
+data class AnalyticsUiState(
+    val period: String = "30D",
+    val totalSpendingPaise: Long = 0L,
+    val totalIncomePaise: Long = 0L,
+    val spendChangePercent: Int = 0,
+    val trendDataPoints: List<Float> = emptyList(),
+    val trendAxisDates: List<String> = emptyList(),
+    val categoryBreakdowns: List<CategorySpendBreakdown> = emptyList(),
+    val insights: List<FinancialInsight> = emptyList(),
+    val isLoading: Boolean = false
+) {
+    val formattedTotalSpending: String
+        get() = "₹" + String.format(Locale("en", "IN"), "%,d", totalSpendingPaise / 100)
+}
+
+class AnalyticsViewModel(
+    private val repository: SpendlyRepository
+) : ViewModel() {
+
+    private val _selectedPeriod = MutableStateFlow("30D")
+    val selectedPeriod: StateFlow<String> = _selectedPeriod.asStateFlow()
+
+    val uiState: StateFlow<AnalyticsUiState> = _selectedPeriod.flatMapLatest { period ->
+        val (startMs, endMs, prevStartMs, prevEndMs, daysInPeriod) = computePeriodTimestamps(period)
+        val cal = Calendar.getInstance()
+        val curYear = cal.get(Calendar.YEAR)
+        val curMonth = cal.get(Calendar.MONTH) + 1
+
+        combine(
+            repository.getTransactionsBetweenFlow(startMs, endMs),
+            repository.getTransactionsBetweenFlow(prevStartMs, prevEndMs),
+            repository.getBudgetsForPeriodFlow(curYear, curMonth)
+        ) { currentTx, prevTx, budgets ->
+            val expenses = currentTx.filter {
+                it.type == TransactionType.EXPENSE && it.status == TransactionStatus.COMPLETED
+            }
+            val income = currentTx.filter {
+                it.type == TransactionType.INCOME && it.status == TransactionStatus.COMPLETED
+            }
+
+            val totalSpend = expenses.sumOf { it.amountPaise }
+            val totalIncome = income.sumOf { it.amountPaise }
+
+            val prevSpend = prevTx.filter {
+                it.type == TransactionType.EXPENSE && it.status == TransactionStatus.COMPLETED
+            }.sumOf { it.amountPaise }
+
+            val changePercent = if (prevSpend > 0L) {
+                (((totalSpend - prevSpend).toDouble() / prevSpend) * 100).toInt()
+            } else {
+                0
+            }
+
+            // Category breakdown
+            val categoryBreakdowns = if (totalSpend > 0L) {
+                expenses.groupBy { it.categoryName.ifBlank { "Others" } to it.categoryColorHex }
+                    .map { (key, txList) ->
+                        val catSpend = txList.sumOf { it.amountPaise }
+                        val pct = ((catSpend.toDouble() / totalSpend) * 100).toInt()
+                        CategorySpendBreakdown(
+                            categoryName = key.first,
+                            colorHex = key.second,
+                            amountPaise = catSpend,
+                            percentage = pct,
+                            transactions = txList.sortedByDescending { it.timestampMs }
+                        )
+                    }
+                    .sortedByDescending { it.amountPaise }
+            } else {
+                emptyList()
+            }
+
+            // Generate trend line points & axis dates
+            val (points, dates) = computeTrendLine(expenses, startMs, endMs, daysInPeriod)
+
+            // Generate Insights
+            val insights = InsightsEngine.generateInsights(
+                currentTransactions = currentTx,
+                previousTransactions = prevTx,
+                budgets = budgets,
+                daysInPeriod = daysInPeriod
+            )
+
+            AnalyticsUiState(
+                period = period,
+                totalSpendingPaise = totalSpend,
+                totalIncomePaise = totalIncome,
+                spendChangePercent = changePercent,
+                trendDataPoints = points,
+                trendAxisDates = dates,
+                categoryBreakdowns = categoryBreakdowns,
+                insights = insights,
+                isLoading = false
+            )
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = AnalyticsUiState(isLoading = true)
+    )
+
+    fun setPeriod(period: String) {
+        _selectedPeriod.value = period
+    }
+
+    private data class PeriodWindow(
+        val startMs: Long,
+        val endMs: Long,
+        val prevStartMs: Long,
+        val prevEndMs: Long,
+        val days: Int
+    )
+
+    private fun computePeriodTimestamps(period: String): PeriodWindow {
+        val now = System.currentTimeMillis()
+        val oneDayMs = 24 * 60 * 60 * 1000L
+        val days = when (period) {
+            "7D" -> 7
+            "30D" -> 30
+            "3M" -> 90
+            "6M" -> 180
+            "1Y" -> 365
+            else -> 30
+        }
+        val durationMs = days * oneDayMs
+        val startMs = now - durationMs
+        val prevStartMs = startMs - durationMs
+        val prevEndMs = startMs
+        return PeriodWindow(startMs, now, prevStartMs, prevEndMs, days)
+    }
+
+    private fun computeTrendLine(
+        expenses: List<Transaction>,
+        startMs: Long,
+        endMs: Long,
+        days: Int
+    ): Pair<List<Float>, List<String>> {
+        val bucketsCount = minOf(6, maxOf(4, days))
+        val bucketDuration = (endMs - startMs) / bucketsCount
+        val points = mutableListOf<Float>()
+        val dates = mutableListOf<String>()
+        val sdf = SimpleDateFormat("d MMM", Locale.ENGLISH)
+
+        for (i in 0 until bucketsCount) {
+            val bStart = startMs + (i * bucketDuration)
+            val bEnd = bStart + bucketDuration
+            val bucketSpend = expenses.filter { it.timestampMs in bStart..bEnd }
+                .sumOf { it.amountPaise }
+            points.add((bucketSpend / 100).toFloat())
+            dates.add(sdf.format(Date(bStart)))
+        }
+
+        // Normalize points to 0f..1f range for bezier chart
+        val maxVal = points.maxOrNull()?.takeIf { it > 0f } ?: 1f
+        val normalized = points.map { it / maxVal }
+
+        return normalized to dates
+    }
+
+    class Factory(private val repository: SpendlyRepository) : ViewModelProvider.Factory {
+        @Suppress("UNCHECKED_CAST")
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            if (modelClass.isAssignableFrom(AnalyticsViewModel::class.java)) {
+                return AnalyticsViewModel(repository) as T
+            }
+            throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+        }
+    }
+}
