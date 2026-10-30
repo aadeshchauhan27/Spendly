@@ -257,6 +257,7 @@ object SMSClassifier {
             paymentApp = paymentApp,
             bankReferenceNum = utr,
             notes = if (accountEnding != null) "A/c ending **$accountEnding" else null,
+            tag = rawContent.trim(),
             source = TransactionSource.SMS_IMPORT,
             rawIdentifier = "SMS_${eventTimestampMs}_${amountPaise}_${utr ?: normalizedSender}",
             relatedTransactionId = relatedTxId

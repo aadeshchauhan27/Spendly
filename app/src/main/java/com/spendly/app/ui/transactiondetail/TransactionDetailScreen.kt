@@ -1,8 +1,12 @@
 package com.spendly.app.ui.transactiondetail
 
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,11 +21,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.AlertDialog
@@ -36,15 +43,22 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import com.spendly.app.core.components.SpendlyButton
 import com.spendly.app.core.components.SpendlyButtonStyle
 import com.spendly.app.core.components.SpendlyCard
@@ -68,12 +82,18 @@ fun TransactionDetailScreen(
     modifier: Modifier = Modifier
 ) {
     val colors = SpendlyTheme.colors
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val clipboardManager = LocalClipboardManager.current
+    val coroutineScope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsState()
     val recategorizePrompt by viewModel.recategorizePrompt.collectAsState()
 
     var showEditNotesDialog by remember { mutableStateOf(false) }
     var showCategoryDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showSmsDialog by remember { mutableStateOf(false) }
+    var rawSmsContent by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(uiState) {
         if (uiState is TransactionDetailUiState.Deleted) {
@@ -126,7 +146,10 @@ fun TransactionDetailScreen(
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Spacer(modifier = Modifier.height(16.dp))
@@ -171,28 +194,57 @@ fun TransactionDetailScreen(
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        // 3 Action Buttons: Add Note, Edit Category, Share
+                        // 4 Action Buttons: Note, Category, Share, View SMS
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             ActionPillButton(
                                 icon = Icons.AutoMirrored.Filled.NoteAdd,
-                                label = if (tx.notes.isNullOrBlank()) "Add Note" else "Edit Note",
+                                label = if (tx.notes.isNullOrBlank()) "Note" else "Edit",
                                 modifier = Modifier.weight(1f),
-                                onClick = { showEditNotesDialog = true }
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    showEditNotesDialog = true
+                                }
                             )
                             ActionPillButton(
                                 icon = Icons.Default.Edit,
                                 label = "Category",
                                 modifier = Modifier.weight(1f),
-                                onClick = { showCategoryDialog = true }
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    showCategoryDialog = true
+                                }
                             )
                             ActionPillButton(
                                 icon = Icons.Default.Share,
                                 label = "Share",
                                 modifier = Modifier.weight(1f),
-                                onClick = { /* Share transaction summary */ }
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    val sendIntent = Intent().apply {
+                                        action = Intent.ACTION_SEND
+                                        putExtra(
+                                            Intent.EXTRA_TEXT,
+                                            "Paid ${tx.formattedRupees} to ${tx.title} via Spendly"
+                                        )
+                                        type = "text/plain"
+                                    }
+                                    context.startActivity(Intent.createChooser(sendIntent, "Share Transaction"))
+                                }
+                            )
+                            ActionPillButton(
+                                icon = Icons.Default.Message,
+                                label = "View SMS",
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    coroutineScope.launch {
+                                        rawSmsContent = viewModel.getExactSmsBody(context, tx)
+                                        showSmsDialog = true
+                                    }
+                                }
                             )
                         }
 
@@ -443,6 +495,100 @@ fun TransactionDetailScreen(
                             containerColor = colors.card
                         )
                     }
+
+                    // View SMS Modal Dialog
+                    if (showSmsDialog) {
+                        val dateFormat = SimpleDateFormat("dd MMMM yyyy, hh:mm a", Locale("en", "IN"))
+                        AlertDialog(
+                            onDismissRequest = { showSmsDialog = false },
+                            containerColor = colors.card,
+                            title = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .clip(CircleShape)
+                                            .background(if (colors.isDark) ElectricLime.copy(alpha = 0.18f) else Color(0xFFE2E8F0)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Message,
+                                            contentDescription = null,
+                                            tint = if (colors.isDark) ElectricLime else Color(0xFF09142A),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = "Original SMS",
+                                            style = SpendlyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = colors.textPrimary
+                                        )
+                                        Text(
+                                            text = dateFormat.format(Date(tx.timestampMs)),
+                                            style = SpendlyTheme.typography.labelSmall,
+                                            color = colors.textMuted
+                                        )
+                                    }
+                                }
+                            },
+                            text = {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 4.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(colors.background)
+                                            .border(1.dp, colors.border, RoundedCornerShape(12.dp))
+                                            .padding(14.dp)
+                                    ) {
+                                        Text(
+                                            text = rawSmsContent ?: "Reading SMS message...",
+                                            style = SpendlyTheme.typography.bodyMedium.copy(
+                                                fontSize = 13.sp,
+                                                lineHeight = 20.sp
+                                            ),
+                                            color = colors.textPrimary
+                                        )
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    SpendlyButton(
+                                        text = "Copy SMS",
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            rawSmsContent?.let { text ->
+                                                clipboardManager.setText(AnnotatedString(text))
+                                                Toast.makeText(context, "SMS copied to clipboard", Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        style = if (colors.isDark) SpendlyButtonStyle.PRIMARY_LIME else SpendlyButtonStyle.SECONDARY_DARK
+                                    )
+                                    SpendlyButton(
+                                        text = "Close",
+                                        onClick = { showSmsDialog = false },
+                                        modifier = Modifier.weight(1f),
+                                        style = SpendlyButtonStyle.OUTLINE
+                                    )
+                                }
+                            },
+                            dismissButton = {}
+                        )
+                    }
                 }
             }
         }
@@ -457,12 +603,16 @@ private fun ActionPillButton(
     onClick: () -> Unit = {}
 ) {
     val colors = SpendlyTheme.colors
+    val haptic = LocalHapticFeedback.current
     Box(
         modifier = modifier
             .clip(PillShape)
             .background(colors.card)
             .border(1.dp, colors.border, PillShape)
-            .clickable(onClick = onClick)
+            .clickable {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
             .padding(vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {

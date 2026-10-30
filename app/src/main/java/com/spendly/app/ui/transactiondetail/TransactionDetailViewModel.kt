@@ -1,5 +1,10 @@
 package com.spendly.app.ui.transactiondetail
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.provider.Telephony
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -129,6 +134,63 @@ class TransactionDetailViewModel(
         viewModelScope.launch {
             repository.deleteTransaction(transactionId)
             isDeleted.value = true
+        }
+    }
+
+    suspend fun getExactSmsBody(context: Context, tx: Transaction): String {
+        // 1. Direct match from transaction tag
+        if (!tx.tag.isNullOrBlank()) {
+            return tx.tag
+        }
+
+        // 2. Query device SMS inbox if permission is granted
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED) {
+            try {
+                val resolver = context.contentResolver
+                val uri = Telephony.Sms.Inbox.CONTENT_URI
+                val projection = arrayOf(
+                    Telephony.Sms.Inbox.BODY,
+                    Telephony.Sms.Inbox.DATE,
+                    Telephony.Sms.Inbox.ADDRESS
+                )
+
+                val timeWindowMs = 10 * 60 * 1000L // 10 minutes window
+                val minDate = tx.timestampMs - timeWindowMs
+                val maxDate = tx.timestampMs + timeWindowMs
+
+                val selection = "${Telephony.Sms.Inbox.DATE} >= ? AND ${Telephony.Sms.Inbox.DATE} <= ?"
+                val selectionArgs = arrayOf(minDate.toString(), maxDate.toString())
+                val sortOrder = "${Telephony.Sms.Inbox.DATE} DESC"
+
+                resolver.query(uri, projection, selection, selectionArgs, sortOrder)?.use { cursor ->
+                    val bodyIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.Inbox.BODY)
+                    while (cursor.moveToNext()) {
+                        val body = cursor.getString(bodyIndex) ?: continue
+                        if (tx.bankReferenceNum != null && body.contains(tx.bankReferenceNum)) {
+                            repository.updateTransaction(tx.copy(tag = body))
+                            return body
+                        }
+                        val rupees = (tx.amountPaise / 100).toString()
+                        if (body.contains(rupees)) {
+                            repository.updateTransaction(tx.copy(tag = body))
+                            return body
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore query exception and fallback
+            }
+        }
+
+        // 3. Fallback formatted representation
+        return buildString {
+            append("Transaction: ${tx.title}\n")
+            append("Amount: ${tx.formattedRupees}\n")
+            append("Status: ${tx.status}\n")
+            if (tx.bankReferenceNum != null) append("Reference / UTR: ${tx.bankReferenceNum}\n")
+            if (tx.counterpartyUpiId != null) append("UPI VPA: ${tx.counterpartyUpiId}\n")
+            if (!tx.notes.isNullOrBlank()) append("Notes: ${tx.notes}\n")
+            append("Source: ${tx.source}")
         }
     }
 

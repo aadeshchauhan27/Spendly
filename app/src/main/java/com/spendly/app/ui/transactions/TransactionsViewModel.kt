@@ -115,6 +115,24 @@ class TransactionsViewModel(
         dateRangeFlow.value = TransactionDateRange(startMs, endMs, label)
     }
 
+    fun filterByDay(timestampMs: Long) {
+        val cal = Calendar.getInstance().apply {
+            timeInMillis = timestampMs
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val startMs = cal.timeInMillis
+        cal.set(Calendar.HOUR_OF_DAY, 23)
+        cal.set(Calendar.MINUTE, 59)
+        cal.set(Calendar.SECOND, 59)
+        cal.set(Calendar.MILLISECOND, 999)
+        val endMs = cal.timeInMillis
+        val dateFormat = SimpleDateFormat("dd MMM", Locale("en", "IN"))
+        dateRangeFlow.value = TransactionDateRange(startMs, endMs, dateFormat.format(Date(startMs)))
+    }
+
     fun clearDateRange() {
         dateRangeFlow.value = null
     }

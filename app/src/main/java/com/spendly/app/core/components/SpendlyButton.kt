@@ -12,6 +12,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.spendly.app.core.theme.DarkNavyBackground
 import com.spendly.app.core.theme.ElectricLime
@@ -37,11 +39,19 @@ fun SpendlyButton(
     icon: (@Composable () -> Unit)? = null
 ) {
     val buttonModifier = if (fullWidth) modifier.fillMaxWidth().height(52.dp) else modifier.height(52.dp)
+    val haptic = LocalHapticFeedback.current
+    val handleOnClick = {
+        haptic.performHapticFeedback(
+            if (style == SpendlyButtonStyle.DESTRUCTIVE) HapticFeedbackType.LongPress
+            else HapticFeedbackType.TextHandleMove
+        )
+        onClick()
+    }
 
     when (style) {
         SpendlyButtonStyle.PRIMARY_LIME -> {
             Button(
-                onClick = onClick,
+                onClick = handleOnClick,
                 modifier = buttonModifier,
                 enabled = enabled,
                 shape = PillShape,
@@ -63,7 +73,7 @@ fun SpendlyButton(
         SpendlyButtonStyle.SECONDARY_DARK -> {
             val colors = SpendlyTheme.colors
             Button(
-                onClick = onClick,
+                onClick = handleOnClick,
                 modifier = buttonModifier,
                 enabled = enabled,
                 shape = PillShape,
@@ -83,7 +93,7 @@ fun SpendlyButton(
         SpendlyButtonStyle.OUTLINE -> {
             val colors = SpendlyTheme.colors
             OutlinedButton(
-                onClick = onClick,
+                onClick = handleOnClick,
                 modifier = buttonModifier,
                 enabled = enabled,
                 shape = PillShape,
@@ -102,7 +112,7 @@ fun SpendlyButton(
         }
         SpendlyButtonStyle.DESTRUCTIVE -> {
             OutlinedButton(
-                onClick = onClick,
+                onClick = handleOnClick,
                 modifier = buttonModifier,
                 enabled = enabled,
                 shape = PillShape,

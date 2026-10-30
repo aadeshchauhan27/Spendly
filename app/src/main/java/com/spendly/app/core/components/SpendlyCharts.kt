@@ -3,6 +3,7 @@ package com.spendly.app.core.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -32,8 +33,10 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -49,13 +52,15 @@ fun SpendlyTrendLineChart(
     points: List<TrendPoint>,
     modifier: Modifier = Modifier,
     lineColor: Color = ElectricLime,
-    height: Dp = 140.dp
+    height: Dp = 140.dp,
+    onPointClick: ((TrendPoint) -> Unit)? = null
 ) {
     if (points.isEmpty()) return
 
     var selectedIndex by remember(points) { mutableStateOf<Int?>(null) }
     val colors = SpendlyTheme.colors
     val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
 
     val rawValues = points.map { it.amountRupees }
     val minVal = rawValues.minOrNull() ?: 0f
@@ -74,6 +79,9 @@ fun SpendlyTrendLineChart(
                         val tappedIdx = ((offset.x - padding + stepX / 2f) / stepX)
                             .toInt()
                             .coerceIn(0, points.size - 1)
+                        if (selectedIndex != tappedIdx) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        }
                         selectedIndex = if (selectedIndex == tappedIdx) null else tappedIdx
                     }
                 )
@@ -87,7 +95,10 @@ fun SpendlyTrendLineChart(
                         val draggedIdx = ((change.position.x - padding + stepX / 2f) / stepX)
                             .toInt()
                             .coerceIn(0, points.size - 1)
-                        selectedIndex = draggedIdx
+                        if (selectedIndex != draggedIdx) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            selectedIndex = draggedIdx
+                        }
                     }
                 )
             }
@@ -210,7 +221,11 @@ fun SpendlyTrendLineChart(
                     .clip(RoundedCornerShape(10.dp))
                     .background(if (colors.isDark) Color(0xFF09142A) else Color(0xFF1E293B))
                     .border(1.dp, lineColor.copy(alpha = 0.85f), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                    .clickable(enabled = onPointClick != null) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onPointClick?.invoke(selectedPoint)
+                    }
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
@@ -223,6 +238,13 @@ fun SpendlyTrendLineChart(
                         style = SpendlyTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                         color = ElectricLime
                     )
+                    if (onPointClick != null) {
+                        Text(
+                            text = "Tap to view txns →",
+                            style = SpendlyTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.SemiBold),
+                            color = lineColor.copy(alpha = 0.9f)
+                        )
+                    }
                 }
             }
         }
@@ -238,7 +260,7 @@ fun SpendlyTrendLineChart(
     height: Dp = 140.dp
 ) {
     val points = dataPoints.mapIndexed { idx, v -> TrendPoint(v, "Point ${idx + 1}") }
-    SpendlyTrendLineChart(points = points, modifier = modifier, lineColor = lineColor, height = height)
+    SpendlyTrendLineChart(points = points, modifier = modifier, lineColor = lineColor, height = height, onPointClick = null)
 }
 
 data class DonutSegment(

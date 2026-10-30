@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -38,6 +39,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -65,9 +68,11 @@ fun TransactionsScreen(
     importViewModel: ImportViewModel,
     smsSyncViewModel: SmsSyncViewModel,
     onTransactionClick: (Long) -> Unit,
+    onSettingsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val colors = SpendlyTheme.colors
+    val haptic = LocalHapticFeedback.current
     val uiState by viewModel.uiState.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
     var showImportSheet by remember { mutableStateOf(false) }
@@ -153,6 +158,32 @@ fun TransactionsScreen(
                                 text = "Import",
                                 style = SpendlyTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = colors.textPrimary
+                            )
+                        }
+                    }
+
+                    // Settings Button
+                    Box(
+                        modifier = Modifier
+                            .clip(PillShape)
+                            .background(colors.card)
+                            .border(1.dp, colors.border, PillShape)
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSettingsClick()
+                            }
+                            .padding(horizontal = 9.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = colors.textPrimary,
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }

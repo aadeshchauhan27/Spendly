@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Savings
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -28,6 +29,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.spendly.app.core.theme.DarkNavyBackground
@@ -39,7 +42,7 @@ enum class BottomTab(val route: String, val label: String, val icon: ImageVector
     TRANSACTIONS("transactions", "Transactions", Icons.Default.ReceiptLong),
     ANALYTICS("analytics", "Analytics", Icons.Default.BarChart),
     UPI("upi_transactions", "UPI Spends", Icons.Default.AccountBalance),
-    MORE("settings", "More", Icons.Default.MoreHoriz)
+    SETTINGS("settings", "Settings", Icons.Default.Settings)
 }
 
 @Composable
@@ -49,6 +52,7 @@ fun SpendlyBottomBar(
     modifier: Modifier = Modifier
 ) {
     val colors = SpendlyTheme.colors
+    val haptic = LocalHapticFeedback.current
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -77,7 +81,10 @@ fun SpendlyBottomBar(
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .clickable { onTabSelected(tab) }
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onTabSelected(tab)
+                        }
                         .padding(vertical = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center

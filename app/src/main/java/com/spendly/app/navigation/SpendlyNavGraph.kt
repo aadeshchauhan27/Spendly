@@ -4,6 +4,7 @@ import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -25,6 +26,7 @@ import com.spendly.app.core.preferences.UserPreferences
 import com.spendly.app.core.theme.SpendlyTheme
 import com.spendly.app.core.theme.ThemeMode
 import com.spendly.app.data.repository.SpendlyRepository
+import com.spendly.app.domain.model.TrendPoint
 import com.spendly.app.ui.analytics.AnalyticsScreen
 import com.spendly.app.ui.analytics.AnalyticsViewModel
 import com.spendly.app.ui.budgets.BudgetsScreen
@@ -72,10 +74,14 @@ fun SpendlyNavGraph(
 
     val showBottomBar = currentDestination in bottomBarRoutes
     val onboardingCompleted by userPreferences.onboardingCompletedFlow.collectAsState(initial = false)
+    val sharedTransactionsViewModel: TransactionsViewModel = viewModel(
+        factory = TransactionsViewModel.Factory(repository)
+    )
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = SpendlyTheme.colors.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             if (showBottomBar && currentDestination != null) {
                 SpendlyBottomBar(
@@ -98,7 +104,7 @@ fun SpendlyNavGraph(
         NavHost(
             navController = navController,
             startDestination = Screen.Splash.route,
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
         ) {
             composable(Screen.Splash.route) {
                 SplashScreen(
@@ -180,14 +186,17 @@ fun SpendlyNavGraph(
                     },
                     onProfileClick = {
                         navController.navigate(Screen.Settings.route)
+                    },
+                    onTrendPointClick = { point ->
+                        if (point.timestampMs > 0L) {
+                            sharedTransactionsViewModel.filterByDay(point.timestampMs)
+                        }
+                        navController.navigate(Screen.Transactions.route)
                     }
                 )
             }
 
             composable(Screen.Transactions.route) {
-                val transactionsViewModel: TransactionsViewModel = viewModel(
-                    factory = TransactionsViewModel.Factory(repository)
-                )
                 val importViewModel: ImportViewModel = viewModel(
                     factory = ImportViewModel.Factory(repository)
                 )
@@ -195,11 +204,14 @@ fun SpendlyNavGraph(
                     factory = SmsSyncViewModel.Factory(repository)
                 )
                 TransactionsScreen(
-                    viewModel = transactionsViewModel,
+                    viewModel = sharedTransactionsViewModel,
                     importViewModel = importViewModel,
                     smsSyncViewModel = smsSyncViewModel,
                     onTransactionClick = { txId ->
                         navController.navigate(Screen.TransactionDetail.createRoute(txId.toString()))
+                    },
+                    onSettingsClick = {
+                        navController.navigate(Screen.Settings.route)
                     }
                 )
             }

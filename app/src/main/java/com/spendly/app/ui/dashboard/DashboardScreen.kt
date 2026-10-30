@@ -40,6 +40,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,6 +61,7 @@ import com.spendly.app.core.theme.PillShape
 import com.spendly.app.core.theme.SpendlyTheme
 import com.spendly.app.core.theme.StatusExpenseRed
 import com.spendly.app.core.theme.StatusIncomeGreen
+import com.spendly.app.domain.model.TrendPoint
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -69,9 +73,11 @@ fun DashboardScreen(
     onViewAllCategories: () -> Unit,
     onTransactionClick: (Long) -> Unit,
     onProfileClick: () -> Unit,
+    onTrendPointClick: (TrendPoint) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val colors = SpendlyTheme.colors
+    val haptic = LocalHapticFeedback.current
     val uiState by viewModel.uiState.collectAsState()
     val periods = listOf("7D", "30D", "90D", "365D")
     val context = LocalContext.current
@@ -348,7 +354,10 @@ fun DashboardScreen(
                                     SpendlyChip(
                                         text = period,
                                         selected = state.selectedPeriod == period,
-                                        onClick = { viewModel.setPeriod(period) }
+                                        onClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            viewModel.setPeriod(period)
+                                        }
                                     )
                                 }
                             }
@@ -385,7 +394,8 @@ fun DashboardScreen(
                                     if (trendPoints.isNotEmpty()) {
                                         SpendlyTrendLineChart(
                                             points = trendPoints,
-                                            lineColor = if (colors.isDark) ElectricLime else Color(0xFF09142A)
+                                            lineColor = if (colors.isDark) ElectricLime else Color(0xFF09142A),
+                                            onPointClick = onTrendPointClick
                                         )
                                     } else {
                                         val trendData = state.summary.trendDataPoints.ifEmpty { listOf(0f, 0f) }

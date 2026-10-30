@@ -134,8 +134,8 @@ object FinancialCalculationEngine {
             if (expenseTx.isEmpty()) {
                 val today = System.currentTimeMillis()
                 return listOf(
-                    TrendPoint(0f, dateFormat.format(Date(today - 86400000L * 3)), fullDateFormat.format(Date(today - 86400000L * 3))),
-                    TrendPoint(0f, dateFormat.format(Date(today)), fullDateFormat.format(Date(today)))
+                    TrendPoint(0f, dateFormat.format(Date(today - 86400000L * 3)), fullDateFormat.format(Date(today - 86400000L * 3)), today - 86400000L * 3),
+                    TrendPoint(0f, dateFormat.format(Date(today)), fullDateFormat.format(Date(today)), today)
                 )
             }
 
@@ -147,8 +147,8 @@ object FinancialCalculationEngine {
                 val dateLabel = dateFormat.format(Date(minTime))
                 val fullDate = fullDateFormat.format(Date(minTime))
                 return listOf(
-                    TrendPoint(totalRupees, dateLabel, fullDate),
-                    TrendPoint(totalRupees, dateLabel, fullDate)
+                    TrendPoint(totalRupees, dateLabel, fullDate, minTime),
+                    TrendPoint(totalRupees, dateLabel, fullDate, minTime)
                 )
             }
 
@@ -170,7 +170,8 @@ object FinancialCalculationEngine {
                 TrendPoint(
                     amountRupees = bucketAmounts[i],
                     dateLabel = dateFormat.format(Date(time)),
-                    fullDate = fullDateFormat.format(Date(time))
+                    fullDate = fullDateFormat.format(Date(time)),
+                    timestampMs = time
                 )
             }
         }

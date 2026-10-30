@@ -3,7 +3,8 @@ package com.spendly.app.domain.model
 data class TrendPoint(
     val amountRupees: Float,
     val dateLabel: String,
-    val fullDate: String = ""
+    val fullDate: String = "",
+    val timestampMs: Long = 0L
 )
 
 data class DashboardSummary(

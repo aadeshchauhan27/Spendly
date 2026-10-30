@@ -11,6 +11,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.spendly.app.core.theme.DarkNavyBackground
 import com.spendly.app.core.theme.ElectricLime
@@ -26,6 +28,7 @@ fun SpendlyChip(
     icon: (@Composable () -> Unit)? = null
 ) {
     val colors = SpendlyTheme.colors
+    val haptic = LocalHapticFeedback.current
     val backgroundColor = if (selected) {
         if (colors.isDark) ElectricLime else Color(0xFF09142A)
     } else {
@@ -45,7 +48,10 @@ fun SpendlyChip(
             .clip(PillShape)
             .background(backgroundColor)
             .border(1.dp, borderColor, PillShape)
-            .clickable(onClick = onClick)
+            .clickable {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
             .padding(horizontal = 14.dp, vertical = 7.dp),
         contentAlignment = Alignment.Center
     ) {
