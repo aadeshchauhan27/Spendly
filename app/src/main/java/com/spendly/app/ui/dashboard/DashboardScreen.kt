@@ -69,7 +69,7 @@ fun DashboardScreen(
 ) {
     val colors = SpendlyTheme.colors
     val uiState by viewModel.uiState.collectAsState()
-    val periods = listOf("7D", "30D", "3M", "1Y")
+    val periods = listOf("7D", "30D", "90D", "365D")
     val context = LocalContext.current
     var visibleRecentCount by remember { mutableStateOf(5) }
 
@@ -241,14 +241,27 @@ fun DashboardScreen(
 
                                     Spacer(modifier = Modifier.height(8.dp))
 
-                                    Text(
-                                        text = state.summary.formattedNetSpending,
-                                        style = SpendlyTheme.typography.displayLarge.copy(
-                                            fontSize = 34.sp,
-                                            fontWeight = FontWeight.Bold
-                                        ),
-                                        color = colors.textPrimary
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.Bottom,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = state.summary.formattedNetSpending,
+                                            style = SpendlyTheme.typography.displayLarge.copy(
+                                                fontSize = if (state.summary.formattedNetSpending.length > 9) 28.sp else 34.sp,
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            color = colors.textPrimary
+                                        )
+                                        if (state.summary.formattedNetSpendingLakhs != null) {
+                                            Text(
+                                                text = "(${state.summary.formattedNetSpendingLakhs})",
+                                                style = SpendlyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                                                color = colors.textSecondary,
+                                                modifier = Modifier.padding(bottom = 4.dp)
+                                            )
+                                        }
+                                    }
 
                                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -257,7 +270,7 @@ fun DashboardScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Column {
+                                        Column(modifier = Modifier.weight(1f)) {
                                             Text(
                                                 text = "Income",
                                                 style = SpendlyTheme.typography.labelSmall,
@@ -266,11 +279,12 @@ fun DashboardScreen(
                                             Text(
                                                 text = state.summary.formattedIncome,
                                                 style = SpendlyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                                color = colors.textPrimary
+                                                color = colors.textPrimary,
+                                                maxLines = 1
                                             )
                                         }
 
-                                        Column {
+                                        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                                             Text(
                                                 text = "Received",
                                                 style = SpendlyTheme.typography.labelSmall,
@@ -279,11 +293,12 @@ fun DashboardScreen(
                                             Text(
                                                 text = state.summary.formattedReceived,
                                                 style = SpendlyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                                color = colors.textPrimary
+                                                color = colors.textPrimary,
+                                                maxLines = 1
                                             )
                                         }
 
-                                        Column {
+                                        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
                                             Text(
                                                 text = "Net Cash Flow",
                                                 style = SpendlyTheme.typography.labelSmall,
@@ -293,7 +308,8 @@ fun DashboardScreen(
                                             Text(
                                                 text = state.summary.formattedCashFlow,
                                                 style = SpendlyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                                color = if (isPositiveFlow) StatusIncomeGreen else StatusExpenseRed
+                                                color = if (isPositiveFlow) StatusIncomeGreen else StatusExpenseRed,
+                                                maxLines = 1
                                             )
                                         }
                                     }

@@ -8,6 +8,9 @@ import com.spendly.app.domain.model.Transaction
 import com.spendly.app.domain.model.TransactionDirection
 import com.spendly.app.domain.model.TransactionStatus
 import com.spendly.app.domain.model.TransactionType
+import com.spendly.app.domain.model.formatPaiseAdaptive
+import com.spendly.app.domain.model.formatPaiseLakhsSubtitle
+import com.spendly.app.domain.model.formatPaiseToRupees
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -27,7 +30,13 @@ data class BankSpendBreakdown(
     val transactions: List<Transaction>
 ) {
     val formattedRupees: String
-        get() = (totalAmountPaise / 100).toString()
+        get() = formatPaiseToRupees(totalAmountPaise, includeSymbol = false, includeDecimals = false)
+
+    val formattedAdaptive: String
+        get() = formatPaiseAdaptive(totalAmountPaise)
+
+    val formattedFull: String
+        get() = formatPaiseToRupees(totalAmountPaise)
 
     val shortLabel: String
         get() = when {
@@ -57,7 +66,10 @@ data class UpiTransactionsUiState(
     val isLoading: Boolean = false
 ) {
     val formattedTotalSpend: String
-        get() = "₹" + String.format(Locale("en", "IN"), "%,d", totalSpendPaise / 100)
+        get() = formatPaiseToRupees(totalSpendPaise, includeDecimals = false)
+
+    val formattedTotalSpendLakhs: String?
+        get() = formatPaiseLakhsSubtitle(totalSpendPaise)
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -81,8 +93,8 @@ class UpiTransactionsViewModel(
         val durationMs = when (period) {
             "7D" -> 7 * 24 * 60 * 60 * 1000L
             "30D" -> 30 * 24 * 60 * 60 * 1000L
-            "3M" -> 90 * 24 * 60 * 60 * 1000L
-            "1Y" -> 365 * 24 * 60 * 60 * 1000L
+            "90D", "3M" -> 90 * 24 * 60 * 60 * 1000L
+            "365D", "1Y" -> 365 * 24 * 60 * 60 * 1000L
             else -> 7 * 24 * 60 * 60 * 1000L
         }
         val startMs = now - durationMs

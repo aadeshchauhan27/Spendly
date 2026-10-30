@@ -13,15 +13,33 @@ data class DashboardSummary(
     val recentTransactions: List<Transaction> = emptyList()
 ) {
     val formattedNetSpending: String
-        get() = formatPaiseToRupees(netSpendingPaise)
+        get() = formatPaiseToRupees(netSpendingPaise, includeDecimals = false)
+
+    val formattedNetSpendingFull: String
+        get() = formatPaiseToRupees(netSpendingPaise, includeDecimals = true)
+
+    val formattedNetSpendingLakhs: String?
+        get() = formatPaiseLakhsSubtitle(netSpendingPaise)
 
     val formattedIncome: String
+        get() = formatPaiseAdaptive(qualifyingIncomePaise)
+
+    val formattedIncomeFull: String
         get() = formatPaiseToRupees(qualifyingIncomePaise)
 
     val formattedReceived: String
+        get() = formatPaiseAdaptive(totalReceivedPaise)
+
+    val formattedReceivedFull: String
         get() = formatPaiseToRupees(totalReceivedPaise)
 
     val formattedCashFlow: String
+        get() {
+            val sign = if (netCashFlowPaise > 0) "+" else ""
+            return "$sign${formatPaiseAdaptive(netCashFlowPaise)}"
+        }
+
+    val formattedCashFlowFull: String
         get() {
             val sign = if (netCashFlowPaise > 0) "+" else ""
             return "$sign${formatPaiseToRupees(netCashFlowPaise)}"

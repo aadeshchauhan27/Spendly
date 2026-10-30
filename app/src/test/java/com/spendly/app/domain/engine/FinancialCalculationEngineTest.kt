@@ -186,4 +186,43 @@ class FinancialCalculationEngineTest {
         assertNotNull(summary.spendingChangePercent)
         assertEquals(-12.0f, summary.spendingChangePercent!!, 0.01f)
     }
+
+    @Test
+    fun formatPaiseAdaptive_correctLakhsAndCrores() {
+        // 13.59 Lakhs (₹13,59,286.45)
+        val incomePaise = 135928645L
+        assertEquals("₹13.59L", com.spendly.app.domain.model.formatPaiseAdaptive(incomePaise))
+        assertEquals("₹13.59 Lakhs", com.spendly.app.domain.model.formatPaiseLakhsSubtitle(incomePaise))
+
+        // 1.71 Lakhs
+        val flowPaise = 17082846L
+        assertEquals("₹1.71L", com.spendly.app.domain.model.formatPaiseAdaptive(flowPaise))
+
+        // Negative 1.71 Lakhs
+        assertEquals("-₹1.71L", com.spendly.app.domain.model.formatPaiseAdaptive(-flowPaise))
+
+        // 28,600 (under 1 Lakh shows full number with commas)
+        val shoppingPaise = 2860000L
+        assertEquals("₹28,600", com.spendly.app.domain.model.formatPaiseAdaptive(shoppingPaise))
+        assertNull(com.spendly.app.domain.model.formatPaiseLakhsSubtitle(shoppingPaise))
+
+        // 6,060
+        val foodPaise = 606000L
+        assertEquals("₹6,060", com.spendly.app.domain.model.formatPaiseAdaptive(foodPaise))
+
+        // 1.25 Crore
+        val crorePaise = 1250000000L
+        assertEquals("₹1.25 Cr", com.spendly.app.domain.model.formatPaiseAdaptive(crorePaise))
+        assertEquals("₹1.25 Crores", com.spendly.app.domain.model.formatPaiseLakhsSubtitle(crorePaise))
+
+        // Zero
+        assertEquals("₹0", com.spendly.app.domain.model.formatPaiseAdaptive(0L))
+    }
+
+    @Test
+    fun formatPaiseToRupees_includeDecimalsFlag() {
+        val amount = 118931698L // ₹11,89,316.98 (11 Lakhs, 89 Thousand, 316)
+        assertEquals("₹11,89,316.98", com.spendly.app.domain.model.formatPaiseToRupees(amount, includeDecimals = true))
+        assertEquals("₹11,89,316", com.spendly.app.domain.model.formatPaiseToRupees(amount, includeDecimals = false))
+    }
 }

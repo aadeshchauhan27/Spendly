@@ -66,7 +66,7 @@ fun UpiTransactionsScreen(
 ) {
     val colors = SpendlyTheme.colors
     val uiState by viewModel.uiState.collectAsState()
-    val periods = listOf("7D", "30D", "3M", "1Y")
+    val periods = listOf("7D", "30D", "90D", "365D")
 
     Column(
         modifier = modifier
@@ -163,9 +163,19 @@ fun UpiTransactionsScreen(
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = uiState.formattedTotalSpend,
-                                    style = SpendlyTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                                    style = SpendlyTheme.typography.headlineMedium.copy(
+                                        fontSize = if (uiState.formattedTotalSpend.length > 9) 24.sp else 28.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
                                     color = colors.textPrimary
                                 )
+                                if (uiState.formattedTotalSpendLakhs != null) {
+                                    Text(
+                                        text = "(${uiState.formattedTotalSpendLakhs})",
+                                        style = SpendlyTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                                        color = colors.textSecondary
+                                    )
+                                }
                             }
 
                             Column(horizontalAlignment = Alignment.End) {
@@ -246,11 +256,7 @@ fun UpiTransactionsScreen(
                                             .clickable { viewModel.selectBank(breakdown.bankName) }
                                     ) {
                                         // Amount label on top of bar
-                                        val amountLabel = when {
-                                            breakdown.totalAmountPaise >= 10000000L -> "₹${breakdown.totalAmountPaise / 10000000}L"
-                                            breakdown.totalAmountPaise >= 100000L -> "₹${breakdown.totalAmountPaise / 100000}k"
-                                            else -> "₹${breakdown.totalAmountPaise / 100}"
-                                        }
+                                        val amountLabel = breakdown.formattedAdaptive
 
                                         Text(
                                             text = amountLabel,

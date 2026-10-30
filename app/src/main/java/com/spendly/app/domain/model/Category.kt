@@ -19,5 +19,8 @@ data class CategorySpending(
     val percentage: Float
 ) {
     val formattedRupees: String
-        get() = formatPaiseToRupees(totalAmountPaise)
+        get() = formatPaiseToRupees(totalAmountPaise, includeDecimals = false)
+
+    val formattedAdaptive: String
+        get() = formatPaiseAdaptive(totalAmountPaise)
 }

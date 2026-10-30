@@ -44,7 +44,7 @@ object SmsReader {
         context: Context,
         existingTransactions: List<Transaction>,
         categories: List<Category>,
-        maxDays: Int = 90
+        maxDays: Int = 365
     ): SmsScanResult = withContext(Dispatchers.IO) {
         val items = mutableListOf<DetectedSmsItem>()
         var totalScanned = 0
@@ -53,6 +53,8 @@ object SmsReader {
         var duplicateCount = 0
         var totalSpentPaise = 0L
         var totalIncomePaise = 0L
+
+        val dedupIndex = TransactionDeduplicator.Index(existingTransactions)
 
         val cutoffTimeMs = System.currentTimeMillis() - (maxDays * 24 * 60 * 60 * 1000L)
 
@@ -98,9 +100,7 @@ object SmsReader {
 
                     if (transaction != null) {
                         totalFound++
-                        val alreadyScanned = items.mapNotNull { it.transaction }
-                        val candidatePool = existingTransactions + alreadyScanned
-                        val duplicate = TransactionDeduplicator.findDuplicate(transaction, candidatePool)
+                        val duplicate = dedupIndex.findDuplicate(transaction)
 
                         if (duplicate != null) {
                             duplicateCount++
@@ -117,6 +117,7 @@ object SmsReader {
                                 )
                             )
                         } else {
+                            dedupIndex.add(transaction)
                             val isSpam = transaction.type == TransactionType.SPAM
                             if (!isSpam) {
                                 validNewCount++

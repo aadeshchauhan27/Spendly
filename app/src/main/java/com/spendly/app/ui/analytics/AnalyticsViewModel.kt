@@ -9,6 +9,9 @@ import com.spendly.app.domain.engine.InsightsEngine
 import com.spendly.app.domain.model.Transaction
 import com.spendly.app.domain.model.TransactionStatus
 import com.spendly.app.domain.model.TransactionType
+import com.spendly.app.domain.model.formatPaiseAdaptive
+import com.spendly.app.domain.model.formatPaiseLakhsSubtitle
+import com.spendly.app.domain.model.formatPaiseToRupees
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -29,7 +32,13 @@ data class CategorySpendBreakdown(
     val transactions: List<Transaction> = emptyList()
 ) {
     val formattedRupees: String
-        get() = (amountPaise / 100).toString()
+        get() = formatPaiseToRupees(amountPaise, includeSymbol = false, includeDecimals = false)
+
+    val formattedAdaptive: String
+        get() = formatPaiseAdaptive(amountPaise)
+
+    val formattedFull: String
+        get() = formatPaiseToRupees(amountPaise)
 }
 
 data class AnalyticsUiState(
@@ -44,7 +53,10 @@ data class AnalyticsUiState(
     val isLoading: Boolean = false
 ) {
     val formattedTotalSpending: String
-        get() = "₹" + String.format(Locale("en", "IN"), "%,d", totalSpendingPaise / 100)
+        get() = formatPaiseToRupees(totalSpendingPaise, includeDecimals = false)
+
+    val formattedTotalSpendingLakhs: String?
+        get() = formatPaiseLakhsSubtitle(totalSpendingPaise)
 }
 
 class AnalyticsViewModel(
@@ -151,9 +163,9 @@ class AnalyticsViewModel(
         val days = when (period) {
             "7D" -> 7
             "30D" -> 30
-            "3M" -> 90
-            "6M" -> 180
-            "1Y" -> 365
+            "90D", "3M" -> 90
+            "180D", "6M" -> 180
+            "365D", "1Y" -> 365
             else -> 30
         }
         val durationMs = days * oneDayMs

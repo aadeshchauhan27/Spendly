@@ -4,7 +4,7 @@ import com.spendly.app.domain.model.Transaction
 
 object TransactionDeduplicator {
 
-    private const val FUZZY_TIME_WINDOW_MS = 2 * 60 * 60 * 1000L // 2 hours window
+    private const val FUZZY_TIME_WINDOW_MS = 10 * 60 * 1000L // 10 minutes window
 
     /**
      * Checks if a new transaction is a duplicate of any existing transactions.
@@ -43,6 +43,58 @@ object TransactionDeduplicator {
             val sameMerchant = candidateMerchant.equals(existingMerchant, ignoreCase = true)
 
             sameAmount && sameDirection && withinTimeWindow && sameMerchant
+        }
+    }
+
+    /**
+     * High-performance deduplication index for bulk scans (e.g. 365 days / thousands of SMS).
+     * Avoids O(N^2) list allocations by indexing bank references, raw IDs, and amounts.
+     */
+    class Index(initialTransactions: List<Transaction> = emptyList()) {
+        private val refMap = mutableMapOf<String, Transaction>()
+        private val rawIdMap = mutableMapOf<String, Transaction>()
+        private val amountMap = mutableMapOf<Long, MutableList<Transaction>>()
+
+        init {
+            initialTransactions.forEach { add(it) }
+        }
+
+        fun add(tx: Transaction) {
+            if (!tx.bankReferenceNum.isNullOrBlank()) {
+                refMap[tx.bankReferenceNum.trim().lowercase()] = tx
+            }
+            if (!tx.rawIdentifier.isNullOrBlank()) {
+                rawIdMap[tx.rawIdentifier.trim().lowercase()] = tx
+            }
+            amountMap.getOrPut(tx.amountPaise) { mutableListOf() }.add(tx)
+        }
+
+        fun findDuplicate(candidate: Transaction): Transaction? {
+            // 1. Bank reference match
+            if (!candidate.bankReferenceNum.isNullOrBlank()) {
+                val match = refMap[candidate.bankReferenceNum.trim().lowercase()]
+                if (match != null) return match
+            }
+
+            // 2. Raw ID match
+            if (!candidate.rawIdentifier.isNullOrBlank()) {
+                val match = rawIdMap[candidate.rawIdentifier.trim().lowercase()]
+                if (match != null) return match
+            }
+
+            // 3. Fast candidate lookup on identical amount only
+            val sameAmountList = amountMap[candidate.amountPaise] ?: return null
+            val candidateMerchant = MerchantNormalizer.normalize(candidate.counterpartyName)
+
+            return sameAmountList.find { existing ->
+                val sameDirection = existing.direction == candidate.direction
+                val timeDiff = Math.abs(existing.timestampMs - candidate.timestampMs)
+                val withinTimeWindow = timeDiff <= FUZZY_TIME_WINDOW_MS
+                val existingMerchant = MerchantNormalizer.normalize(existing.counterpartyName)
+                val sameMerchant = candidateMerchant.equals(existingMerchant, ignoreCase = true)
+
+                sameDirection && withinTimeWindow && sameMerchant
+            }
         }
     }
 }

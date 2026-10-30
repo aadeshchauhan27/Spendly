@@ -68,7 +68,7 @@ fun AnalyticsScreen(
     val colors = SpendlyTheme.colors
     val selectedPeriod by viewModel.selectedPeriod.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
-    val periods = listOf("7D", "30D", "3M", "6M", "1Y")
+    val periods = listOf("7D", "30D", "90D", "365D")
 
     var selectedCategoryBreakdown by remember { mutableStateOf<CategorySpendBreakdown?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -141,11 +141,18 @@ fun AnalyticsScreen(
                                     Text(
                                         text = uiState.formattedTotalSpending,
                                         style = SpendlyTheme.typography.headlineLarge.copy(
-                                            fontSize = 32.sp,
+                                            fontSize = if (uiState.formattedTotalSpending.length > 9) 28.sp else 32.sp,
                                             fontWeight = FontWeight.Bold
                                         ),
                                         color = colors.textPrimary
                                     )
+                                    if (uiState.formattedTotalSpendingLakhs != null) {
+                                        Text(
+                                            text = "(${uiState.formattedTotalSpendingLakhs})",
+                                            style = SpendlyTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                                            color = colors.textSecondary
+                                        )
+                                    }
                                     Text(
                                         text = "Total Spending",
                                         style = SpendlyTheme.typography.bodySmall,
@@ -282,7 +289,7 @@ fun AnalyticsScreen(
 
                                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                                     Text(
-                                                        text = "₹${cat.formattedRupees} (${cat.percentage}%)",
+                                                        text = "${cat.formattedAdaptive} (${cat.percentage}%)",
                                                         style = SpendlyTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                                                         color = colors.textPrimary
                                                     )
@@ -424,7 +431,7 @@ fun AnalyticsScreen(
                             color = colors.textPrimary
                         )
                         Text(
-                            text = "${breakdown.transactions.size} transactions • ₹${breakdown.formattedRupees} (${breakdown.percentage}%)",
+                            text = "${breakdown.transactions.size} transactions • ${breakdown.formattedFull} (${breakdown.formattedAdaptive})",
                             style = SpendlyTheme.typography.bodySmall,
                             color = colors.textSecondary
                         )

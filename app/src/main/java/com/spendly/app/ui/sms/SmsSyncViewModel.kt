@@ -57,10 +57,10 @@ class SmsSyncViewModel(
             try {
                 val existing = repository.getAllTransactionsFlow().first()
                 val categories = repository.getAllCategoriesFlow().first()
-                val scanResult = SmsReader.scanInbox(context, existing, categories)
+                val scanResult = SmsReader.scanInbox(context, existing, categories, maxDays = 365)
 
                 if (scanResult.items.isEmpty()) {
-                    _uiState.value = SmsSyncUiState.Error("No transaction SMS messages found in the last 90 days.")
+                    _uiState.value = SmsSyncUiState.Error("No transaction SMS messages found in the last 365 days.")
                 } else {
                     _uiState.value = SmsSyncUiState.Preview(scanResult)
                 }

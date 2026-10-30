@@ -211,7 +211,7 @@ fun CategoriesScreen(
                                     )
                                     Spacer(modifier = Modifier.width(20.dp))
                                     Text(
-                                        text = cat.formattedRupees,
+                                        text = cat.formattedAdaptive,
                                         style = SpendlyTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                                         color = colors.textPrimary
                                     )

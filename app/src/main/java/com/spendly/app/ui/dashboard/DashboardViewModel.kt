@@ -56,8 +56,8 @@ class DashboardViewModel(
         val durationMs = when (period) {
             "7D" -> 7 * 24 * 60 * 60 * 1000L
             "30D" -> 30 * 24 * 60 * 60 * 1000L
-            "3M" -> 90 * 24 * 60 * 60 * 1000L
-            "1Y" -> 365 * 24 * 60 * 60 * 1000L
+            "90D", "3M" -> 90 * 24 * 60 * 60 * 1000L
+            "365D", "1Y" -> 365 * 24 * 60 * 60 * 1000L
             else -> 7 * 24 * 60 * 60 * 1000L
         }
         val startMs = now - durationMs
@@ -99,7 +99,7 @@ class DashboardViewModel(
                 val existing = repository.getAllTransactionsFlow().first()
 
                 _syncMessage.value = "Parsing and categorizing bank messages..."
-                val scanResult = SmsReader.scanInbox(context, existing, categories, maxDays = 90)
+                val scanResult = SmsReader.scanInbox(context, existing, categories, maxDays = 365)
                 val newTransactions = scanResult.items
                     .filter { it.isSelected && it.transaction != null }
                     .mapNotNull { it.transaction }
