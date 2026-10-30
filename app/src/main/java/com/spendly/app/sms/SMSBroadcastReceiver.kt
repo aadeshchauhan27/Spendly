@@ -19,6 +19,8 @@ import com.spendly.app.domain.engine.SMSTransactionParser
 import com.spendly.app.domain.engine.TransactionDeduplicator
 import com.spendly.app.domain.model.Transaction
 import com.spendly.app.domain.model.TransactionSource
+import com.spendly.app.domain.model.TransactionStatus
+import com.spendly.app.domain.model.TransactionType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -49,6 +51,8 @@ class SMSBroadcastReceiver : BroadcastReceiver() {
 
                 val categoryEntities = categoryDao.getAllCategoriesFlow().first()
                 val availableCategories = categoryEntities.map { it.toDomain() }
+                val existingTransactionEntities = transactionDao.getAllTransactionsFlow().first()
+                val existingTransactions = existingTransactionEntities.map { it.toDomain() }
 
                 for (sms in messages) {
                     val sender = sms.displayOriginatingAddress ?: sms.originatingAddress ?: ""
@@ -59,17 +63,36 @@ class SMSBroadcastReceiver : BroadcastReceiver() {
                         sender = sender,
                         content = content,
                         messageTimestampMs = timestamp,
-                        availableCategories = availableCategories
+                        availableCategories = availableCategories,
+                        existingTransactions = existingTransactions
                     )
 
                     if (transaction != null) {
-                        val existingTransactionEntities = transactionDao.getAllTransactionsFlow().first()
-                        val existingTransactions = existingTransactionEntities.map { it.toDomain() }
                         val duplicate = TransactionDeduplicator.findDuplicate(transaction, existingTransactions)
 
                         if (duplicate != null) {
-                            Log.d(TAG, "Duplicate transaction from $sender, skipping.")
+                            if (TransactionDeduplicator.shouldPreferCandidate(transaction, duplicate)) {
+                                val updated = duplicate.copy(
+                                    status = transaction.status,
+                                    bankReferenceNum = transaction.bankReferenceNum ?: duplicate.bankReferenceNum,
+                                    notes = transaction.notes ?: duplicate.notes,
+                                    updatedAtMs = System.currentTimeMillis()
+                                ).toEntity()
+                                transactionDao.update(updated)
+                                Log.d(TAG, "Updated transaction ${duplicate.id} with completed confirmation from $sender")
+                            } else {
+                                Log.d(TAG, "Duplicate transaction from $sender, skipping.")
+                            }
                             continue
+                        }
+
+                        // If this is a reversal linked to an original transaction, update original transaction status
+                        if (transaction.type == TransactionType.REVERSAL && transaction.relatedTransactionId != null) {
+                            val orig = transactionDao.getTransactionById(transaction.relatedTransactionId)
+                            if (orig != null) {
+                                transactionDao.update(orig.copy(status = TransactionStatus.REVERSED.name, updatedAtMs = System.currentTimeMillis()))
+                                Log.d(TAG, "Marked original transaction ${orig.id} as REVERSED")
+                            }
                         }
 
                         val entity = transaction.copy(

@@ -355,13 +355,13 @@ class SpendlyRepositoryImpl(
     override suspend fun insertTransactionFromSMS(sender: String, content: String): Result<Long> {
         val availableCategories = categoryDao.getAllCategoriesFlow().map { list -> list.map { it.toDomain() } }.firstOrNull() ?: emptyList()
         
+        val existingTransactions = getAllTransactionsFlow().firstOrNull() ?: emptyList()
         val transaction = SMSTransactionParser.parseSms(
             sender = sender,
             content = content,
-            availableCategories = availableCategories
+            availableCategories = availableCategories,
+            existingTransactions = existingTransactions
         ) ?: return Result.failure(IllegalArgumentException("SMS content does not appear to be a transaction"))
-        
-        val existingTransactions = getAllTransactionsFlow().firstOrNull() ?: emptyList()
         val duplicate = TransactionDeduplicator.findDuplicate(transaction, existingTransactions)
         
         if (duplicate != null) {
@@ -388,7 +388,8 @@ class SpendlyRepositoryImpl(
             val transaction = SMSTransactionParser.parseSms(
                 sender = sender,
                 content = content,
-                availableCategories = availableCategories
+                availableCategories = availableCategories,
+                existingTransactions = existingTransactions
             )
             
             if (transaction != null) {

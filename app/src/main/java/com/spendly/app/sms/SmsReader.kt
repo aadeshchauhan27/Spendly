@@ -95,7 +95,8 @@ object SmsReader {
                         sender = sender,
                         content = body,
                         messageTimestampMs = dateMs,
-                        availableCategories = categories
+                        availableCategories = categories,
+                        existingTransactions = existingTransactions
                     )
 
                     if (transaction != null) {

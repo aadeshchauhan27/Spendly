@@ -1,10 +1,11 @@
 package com.spendly.app.domain.engine
 
 import com.spendly.app.domain.model.Transaction
+import com.spendly.app.domain.model.TransactionStatus
 
 object TransactionDeduplicator {
 
-    private const val FUZZY_TIME_WINDOW_MS = 10 * 60 * 1000L // 10 minutes window
+    private const val FUZZY_TIME_WINDOW_MS = 15 * 60 * 1000L // 15 minutes window
 
     /**
      * Checks if a new transaction is a duplicate of any existing transactions.
@@ -31,7 +32,7 @@ object TransactionDeduplicator {
         }
 
         // 3. Conservative fuzzy match:
-        // Same amount in paise + normalized counterparty match + timestamp within 10 minutes
+        // Same amount in paise + same direction + normalized counterparty match + timestamp within 15 minutes
         val candidateMerchant = MerchantNormalizer.normalize(candidate.counterpartyName)
 
         return existingTransactions.find { existing ->
@@ -44,6 +45,26 @@ object TransactionDeduplicator {
 
             sameAmount && sameDirection && withinTimeWindow && sameMerchant
         }
+    }
+
+    /**
+     * Determines if a candidate transaction offers stronger confirmation of completion
+     * than an existing transaction (e.g. Bank Debit Confirmation vs Payment Initiated).
+     */
+    fun shouldPreferCandidate(candidate: Transaction, existing: Transaction): Boolean {
+        // 1. Completed status beats Pending or Failed
+        if (candidate.status == TransactionStatus.COMPLETED && existing.status != TransactionStatus.COMPLETED) {
+            return true
+        }
+        // 2. Having Bank UTR beats not having one
+        if (!candidate.bankReferenceNum.isNullOrBlank() && existing.bankReferenceNum.isNullOrBlank()) {
+            return true
+        }
+        // 3. Having account/card details beats missing notes
+        if (!candidate.notes.isNullOrBlank() && existing.notes.isNullOrBlank()) {
+            return true
+        }
+        return false
     }
 
     /**

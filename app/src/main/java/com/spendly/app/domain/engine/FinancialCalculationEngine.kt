@@ -51,6 +51,11 @@ object FinancialCalculationEngine {
                     val currentCatTotal = categorySpendingMap.getOrDefault(tx.categoryId, 0L)
                     categorySpendingMap[tx.categoryId] = (currentCatTotal - tx.amountPaise).coerceAtLeast(0L)
                 }
+                TransactionType.CASHBACK -> {
+                    // Cashback is a financial reward/credit, recorded as incoming cash flow and qualifying income
+                    qualifyingIncomePaise += tx.amountPaise
+                    totalReceivedPaise += tx.amountPaise
+                }
                 TransactionType.INCOME -> {
                     qualifyingIncomePaise += tx.amountPaise
                     totalReceivedPaise += tx.amountPaise
@@ -62,7 +67,7 @@ object FinancialCalculationEngine {
                         grossSpendingPaise += tx.amountPaise
                     }
                 }
-                TransactionType.TRANSFER_SELF, TransactionType.SPAM -> {
+                TransactionType.TRANSFER, TransactionType.TRANSFER_SELF, TransactionType.SPAM -> {
                     // Own-account transfers and spam offers have zero net impact on spending or income
                 }
             }

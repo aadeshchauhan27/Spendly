@@ -133,7 +133,8 @@ class SmsSyncViewModel(
                 sender = sender,
                 content = content,
                 messageTimestampMs = System.currentTimeMillis(),
-                availableCategories = categories
+                availableCategories = categories,
+                existingTransactions = existing
             )
 
             if (transaction == null) {

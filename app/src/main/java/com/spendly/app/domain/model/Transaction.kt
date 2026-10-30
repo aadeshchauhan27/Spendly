@@ -3,10 +3,12 @@ package com.spendly.app.domain.model
 enum class TransactionType {
     EXPENSE,
     INCOME,
-    REFUND,
-    REVERSAL,
+    TRANSFER,
     TRANSFER_SELF,
     TRANSFER_OTHER,
+    REFUND,
+    CASHBACK,
+    REVERSAL,
     SPAM
 }
 
@@ -18,7 +20,8 @@ enum class TransactionDirection {
 enum class TransactionStatus {
     COMPLETED,
     PENDING,
-    FAILED
+    FAILED,
+    REVERSED
 }
 
 enum class TransactionSource {
