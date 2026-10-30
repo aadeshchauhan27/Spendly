@@ -1,5 +1,6 @@
 package com.spendly.app.ui.transactions
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,11 +15,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Message
@@ -27,6 +31,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -69,8 +74,15 @@ fun TransactionsScreen(
     smsSyncViewModel: SmsSyncViewModel,
     onTransactionClick: (Long) -> Unit,
     onSettingsClick: () -> Unit = {},
+    onBackClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    if (onBackClick != null) {
+        BackHandler {
+            onBackClick()
+        }
+    }
+
     val colors = SpendlyTheme.colors
     val haptic = LocalHapticFeedback.current
     val uiState by viewModel.uiState.collectAsState()
@@ -94,11 +106,34 @@ fun TransactionsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Transactions",
-                    style = SpendlyTheme.typography.headlineLarge.copy(fontSize = 26.sp),
-                    color = colors.textPrimary
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (onBackClick != null) {
+                        IconButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onBackClick()
+                            },
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(colors.card)
+                                .border(1.dp, colors.border, CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back to Home",
+                                tint = colors.textPrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                    }
+                    Text(
+                        text = "Transactions",
+                        style = SpendlyTheme.typography.headlineLarge.copy(fontSize = 24.sp),
+                        color = colors.textPrimary
+                    )
+                }
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -272,33 +307,77 @@ fun TransactionsScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Date Range & Category Filter Controls
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    // Quick Date Filter Chips: All, 7D, 30D, 60D, 90D, This Year, Custom
+                    val currentRangeLabel = state.dateRange?.label
+                    val isCustom = state.dateRange != null && currentRangeLabel !in listOf("7D", "30D", "60D", "90D", "This Year")
+                    val customChipText = if (isCustom) "📅 $currentRangeLabel" else "📅 Custom"
+
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp)
                     ) {
-                        val isRangeActive = state.dateRange != null
-                        val rangeLabel = if (isRangeActive) "📅 ${state.dateRange!!.label}" else "📅 Date Range"
-
-                        SpendlyChip(
-                            text = rangeLabel,
-                            selected = isRangeActive,
-                            onClick = { showDateRangePicker = true }
-                        )
-
-                        if (isRangeActive) {
-                            Text(
-                                text = "Clear ✕",
-                                style = SpendlyTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = if (colors.isDark) ElectricLime else Color(0xFFDC2626),
-                                modifier = Modifier
-                                    .clip(PillShape)
-                                    .clickable { viewModel.clearDateRange() }
-                                    .padding(horizontal = 4.dp, vertical = 4.dp)
+                        item {
+                            SpendlyChip(
+                                text = "All Time",
+                                selected = state.dateRange == null,
+                                onClick = { viewModel.clearDateRange() }
                             )
+                        }
+                        item {
+                            SpendlyChip(
+                                text = "7D",
+                                selected = currentRangeLabel == "7D",
+                                onClick = { viewModel.filterByPeriod(7) }
+                            )
+                        }
+                        item {
+                            SpendlyChip(
+                                text = "30D",
+                                selected = currentRangeLabel == "30D",
+                                onClick = { viewModel.filterByPeriod(30) }
+                            )
+                        }
+                        item {
+                            SpendlyChip(
+                                text = "60D",
+                                selected = currentRangeLabel == "60D",
+                                onClick = { viewModel.filterByPeriod(60) }
+                            )
+                        }
+                        item {
+                            SpendlyChip(
+                                text = "90D",
+                                selected = currentRangeLabel == "90D",
+                                onClick = { viewModel.filterByPeriod(90) }
+                            )
+                        }
+                        item {
+                            SpendlyChip(
+                                text = "This Year",
+                                selected = currentRangeLabel == "This Year",
+                                onClick = { viewModel.filterByThisYear() }
+                            )
+                        }
+                        item {
+                            SpendlyChip(
+                                text = customChipText,
+                                selected = isCustom,
+                                onClick = { showDateRangePicker = true }
+                            )
+                        }
+                        if (state.dateRange != null) {
+                            item {
+                                Text(
+                                    text = "Clear ✕",
+                                    style = SpendlyTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = if (colors.isDark) ElectricLime else Color(0xFFDC2626),
+                                    modifier = Modifier
+                                        .clip(PillShape)
+                                        .clickable { viewModel.clearDateRange() }
+                                        .padding(horizontal = 6.dp, vertical = 6.dp)
+                                )
+                            }
                         }
                     }
 

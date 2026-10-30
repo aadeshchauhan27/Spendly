@@ -152,20 +152,28 @@ object FinancialCalculationEngine {
                 )
             }
 
-            val step = (maxTime - minTime) / buckets.coerceAtLeast(1)
-            val bucketAmounts = FloatArray(buckets) { 0f }
-            val bucketMidTimestamps = LongArray(buckets) { 0L }
+            val spanDays = ((maxTime - minTime) / 86400000L).toInt()
+            val effectiveBuckets = when {
+                spanDays <= 7 -> 7
+                spanDays <= 30 -> 12
+                spanDays <= 90 -> 16
+                else -> 24
+            }.coerceAtLeast(buckets)
 
-            for (i in 0 until buckets) {
+            val step = (maxTime - minTime) / effectiveBuckets.coerceAtLeast(1)
+            val bucketAmounts = FloatArray(effectiveBuckets) { 0f }
+            val bucketMidTimestamps = LongArray(effectiveBuckets) { 0L }
+
+            for (i in 0 until effectiveBuckets) {
                 bucketMidTimestamps[i] = minTime + (i * step) + (step / 2)
             }
 
             expenseTx.forEach { tx ->
-                val bucketIndex = (((tx.timestampMs - minTime) / step).toInt()).coerceIn(0, buckets - 1)
+                val bucketIndex = (((tx.timestampMs - minTime) / step).toInt()).coerceIn(0, effectiveBuckets - 1)
                 bucketAmounts[bucketIndex] += (tx.amountPaise / 100f)
             }
 
-            return (0 until buckets).map { i ->
+            return (0 until effectiveBuckets).map { i ->
                 val time = bucketMidTimestamps[i]
                 TrendPoint(
                     amountRupees = bucketAmounts[i],

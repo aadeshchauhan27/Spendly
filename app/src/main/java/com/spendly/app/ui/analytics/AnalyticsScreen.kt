@@ -55,6 +55,7 @@ import com.spendly.app.core.theme.PillShape
 import com.spendly.app.core.theme.SpendlyTheme
 import com.spendly.app.core.theme.StatusIncomeGreen
 import com.spendly.app.domain.engine.InsightType
+import com.spendly.app.domain.model.TrendPoint
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -64,6 +65,7 @@ import java.util.Locale
 fun AnalyticsScreen(
     viewModel: AnalyticsViewModel,
     onTransactionClick: ((Long) -> Unit)? = null,
+    onTrendPointClick: ((TrendPoint) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val colors = SpendlyTheme.colors
@@ -207,11 +209,12 @@ fun AnalyticsScreen(
 
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            if (uiState.trendDataPoints.isNotEmpty()) {
+                            if (uiState.trendPoints.isNotEmpty()) {
                                 SpendlyTrendLineChart(
-                                    dataPoints = uiState.trendDataPoints,
+                                    points = uiState.trendPoints,
                                     lineColor = if (colors.isDark) ElectricLime else Color(0xFF09142A),
-                                    height = 150.dp
+                                    height = 150.dp,
+                                    onPointClick = onTrendPointClick
                                 )
                             }
 

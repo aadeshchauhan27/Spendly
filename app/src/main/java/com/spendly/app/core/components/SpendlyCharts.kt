@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -15,9 +16,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,44 +74,68 @@ fun SpendlyTrendLineChart(
         modifier = modifier
             .fillMaxWidth()
             .height(height)
-            .pointerInput(points) {
-                detectTapGestures(
-                    onTap = { offset ->
-                        val padding = with(density) { 16.dp.toPx() }
-                        val width = size.width.toFloat()
-                        val stepX = (width - padding * 2) / (points.size - 1).coerceAtLeast(1)
-                        val tappedIdx = ((offset.x - padding + stepX / 2f) / stepX)
-                            .toInt()
-                            .coerceIn(0, points.size - 1)
-                        if (selectedIndex != tappedIdx) {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        }
-                        selectedIndex = if (selectedIndex == tappedIdx) null else tappedIdx
-                    }
-                )
-            }
-            .pointerInput(points) {
-                detectDragGestures(
-                    onDrag = { change, _ ->
-                        val padding = with(density) { 16.dp.toPx() }
-                        val width = size.width.toFloat()
-                        val stepX = (width - padding * 2) / (points.size - 1).coerceAtLeast(1)
-                        val draggedIdx = ((change.position.x - padding + stepX / 2f) / stepX)
-                            .toInt()
-                            .coerceIn(0, points.size - 1)
-                        if (selectedIndex != draggedIdx) {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            selectedIndex = draggedIdx
-                        }
-                    }
-                )
-            }
     ) {
-        val widthPx = with(density) { maxWidth.toPx() }
-        val heightPx = with(density) { maxHeight.toPx() }
-        val paddingPx = with(density) { 16.dp.toPx() }
-        val graphHeightPx = heightPx - paddingPx * 2
-        val stepXPx = (widthPx - paddingPx * 2) / (points.size - 1).coerceAtLeast(1)
+        val containerMaxWidth = maxWidth
+        val containerMaxHeight = maxHeight
+        val minStep = 44.dp
+        val minTotalWidth = minStep * (points.size - 1).coerceAtLeast(1) + 32.dp
+        val isScrollable = minTotalWidth > containerMaxWidth
+        val chartWidth = if (isScrollable) minTotalWidth else containerMaxWidth
+        val scrollState = rememberScrollState()
+
+        LaunchedEffect(points, isScrollable) {
+            if (isScrollable) {
+                scrollState.scrollTo(scrollState.maxValue)
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (isScrollable) Modifier.horizontalScroll(scrollState) else Modifier)
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(chartWidth)
+                    .height(height)
+                    .pointerInput(points) {
+                        detectTapGestures(
+                            onTap = { offset ->
+                                val padding = with(density) { 16.dp.toPx() }
+                                val width = size.width.toFloat()
+                                val stepX = (width - padding * 2) / (points.size - 1).coerceAtLeast(1)
+                                val tappedIdx = ((offset.x - padding + stepX / 2f) / stepX)
+                                    .toInt()
+                                    .coerceIn(0, points.size - 1)
+                                if (selectedIndex != tappedIdx) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                }
+                                selectedIndex = if (selectedIndex == tappedIdx) null else tappedIdx
+                            }
+                        )
+                    }
+                    .pointerInput(points) {
+                        detectDragGestures(
+                            onDrag = { change, _ ->
+                                val padding = with(density) { 16.dp.toPx() }
+                                val width = size.width.toFloat()
+                                val stepX = (width - padding * 2) / (points.size - 1).coerceAtLeast(1)
+                                val draggedIdx = ((change.position.x - padding + stepX / 2f) / stepX)
+                                    .toInt()
+                                    .coerceIn(0, points.size - 1)
+                                if (selectedIndex != draggedIdx) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    selectedIndex = draggedIdx
+                                }
+                            }
+                        )
+                    }
+            ) {
+                val widthPx = with(density) { chartWidth.toPx() }
+                val heightPx = with(density) { containerMaxHeight.toPx() }
+                val paddingPx = with(density) { 16.dp.toPx() }
+                val graphHeightPx = heightPx - paddingPx * 2
+                val stepXPx = (widthPx - paddingPx * 2) / (points.size - 1).coerceAtLeast(1)
 
         val calculatedPoints = points.mapIndexed { index, pt ->
             val normY = (pt.amountRupees - minVal) / (maxVal - minVal)
@@ -213,7 +241,7 @@ fun SpendlyTrendLineChart(
 
             val isNearTop = yDp < 46.dp
             val tooltipY = if (isNearTop) yDp + 14.dp else (yDp - 46.dp).coerceAtLeast(2.dp)
-            val tooltipX = (xDp - 50.dp).coerceIn(8.dp, maxWidth - 108.dp)
+            val tooltipX = (xDp - 50.dp).coerceIn(8.dp, (chartWidth - 108.dp).coerceAtLeast(8.dp))
 
             Box(
                 modifier = Modifier
@@ -246,6 +274,8 @@ fun SpendlyTrendLineChart(
                         )
                     }
                 }
+            }
+        }
             }
         }
     }

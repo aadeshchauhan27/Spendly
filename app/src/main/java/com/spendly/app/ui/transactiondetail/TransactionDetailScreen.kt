@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
@@ -71,6 +72,7 @@ import com.spendly.app.core.theme.ElectricLime
 import com.spendly.app.core.theme.PillShape
 import com.spendly.app.core.theme.SpendlyTheme
 import com.spendly.app.core.theme.StatusIncomeGreen
+import com.spendly.app.ui.categories.AddCategoryDialog
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -93,6 +95,7 @@ fun TransactionDetailScreen(
     var showCategoryDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showSmsDialog by remember { mutableStateOf(false) }
+    var showCreateCategoryDialog by remember { mutableStateOf(false) }
     var rawSmsContent by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(uiState) {
@@ -340,17 +343,58 @@ fun TransactionDetailScreen(
                         AlertDialog(
                             onDismissRequest = { showCategoryDialog = false },
                             title = { 
-                                Text(
-                                    "Select Category", 
-                                    style = SpendlyTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                                    color = colors.textPrimary 
-                                ) 
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        "Select Category", 
+                                        style = SpendlyTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                        color = colors.textPrimary 
+                                    )
+                                }
                             },
                             text = {
                                 Column(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(340.dp)
+                                        .verticalScroll(rememberScrollState()),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
+                                    // "+ Create New Category" Button
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(if (colors.isDark) ElectricLime.copy(alpha = 0.15f) else Color(0xFFF1F5F9))
+                                            .border(1.dp, if (colors.isDark) ElectricLime.copy(alpha = 0.5f) else colors.border, RoundedCornerShape(12.dp))
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                showCreateCategoryDialog = true
+                                            }
+                                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.Add,
+                                                contentDescription = "New Category",
+                                                tint = if (colors.isDark) ElectricLime else colors.textPrimary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "+ Create New Category",
+                                                style = SpendlyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                                color = if (colors.isDark) ElectricLime else colors.textPrimary
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(4.dp))
+
                                     state.categories.forEach { cat ->
                                         val isCurrent = cat.id == tx.categoryId
                                         val (catIcon, defaultCatColor) = getCategoryIconAndColor(cat.name)
@@ -366,6 +410,7 @@ fun TransactionDetailScreen(
                                                 .clip(RoundedCornerShape(14.dp))
                                                 .background(if (isCurrent) (if (colors.isDark) Color(0xFF192A4D) else Color(0xFFE2E8F0)) else Color.Transparent)
                                                 .clickable {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                                     viewModel.requestCategoryChange(cat)
                                                     showCategoryDialog = false
                                                 }
@@ -413,6 +458,18 @@ fun TransactionDetailScreen(
                                 )
                             },
                             containerColor = colors.card
+                        )
+                    }
+
+                    // Create New Category Dialog right from assignment page
+                    if (showCreateCategoryDialog) {
+                        AddCategoryDialog(
+                            onDismissRequest = { showCreateCategoryDialog = false },
+                            onConfirm = { name, _, colorHex, iconName ->
+                                viewModel.createAndAssignCategory(name, colorHex, iconName)
+                                showCreateCategoryDialog = false
+                                showCategoryDialog = false
+                            }
                         )
                     }
 

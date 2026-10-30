@@ -87,7 +87,15 @@ fun SpendlyNavGraph(
                 SpendlyBottomBar(
                     currentRoute = currentDestination,
                     onTabSelected = { tab ->
-                        if (currentDestination != tab.route) {
+                        if (tab == BottomTab.HOME) {
+                            navController.navigate(Screen.Dashboard.route) {
+                                popUpTo(Screen.Dashboard.route) {
+                                    inclusive = false
+                                }
+                                launchSingleTop = true
+                                restoreState = false
+                            }
+                        } else if (currentDestination != tab.route) {
                             navController.navigate(tab.route) {
                                 popUpTo(Screen.Dashboard.route) {
                                     saveState = true
@@ -212,6 +220,12 @@ fun SpendlyNavGraph(
                     },
                     onSettingsClick = {
                         navController.navigate(Screen.Settings.route)
+                    },
+                    onBackClick = {
+                        navController.navigate(Screen.Dashboard.route) {
+                            popUpTo(Screen.Dashboard.route) { inclusive = false }
+                            launchSingleTop = true
+                        }
                     }
                 )
             }
@@ -236,7 +250,11 @@ fun SpendlyNavGraph(
                 )
                 CategoriesScreen(
                     viewModel = categoriesViewModel,
-                    onBackClick = { navController.popBackStack() }
+                    onBackClick = { navController.popBackStack() },
+                    onCategoryClick = { categoryName ->
+                        sharedTransactionsViewModel.onCategorySelect(categoryName)
+                        navController.navigate(Screen.Transactions.route)
+                    }
                 )
             }
 
@@ -258,6 +276,12 @@ fun SpendlyNavGraph(
                     viewModel = analyticsViewModel,
                     onTransactionClick = { txId ->
                         navController.navigate(Screen.TransactionDetail.createRoute(txId.toString()))
+                    },
+                    onTrendPointClick = { point ->
+                        if (point.timestampMs > 0L) {
+                            sharedTransactionsViewModel.filterByDay(point.timestampMs)
+                        }
+                        navController.navigate(Screen.Transactions.route)
                     }
                 )
             }

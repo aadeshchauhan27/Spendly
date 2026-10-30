@@ -133,6 +133,28 @@ class TransactionsViewModel(
         dateRangeFlow.value = TransactionDateRange(startMs, endMs, dateFormat.format(Date(startMs)))
     }
 
+    fun filterByPeriod(days: Int) {
+        val now = System.currentTimeMillis()
+        val startMs = now - (days * 86400000L)
+        val dateFormat = SimpleDateFormat("dd MMM", Locale("en", "IN"))
+        val label = "${days}D"
+        dateRangeFlow.value = TransactionDateRange(startMs, now, label)
+    }
+
+    fun filterByThisYear() {
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.MONTH, Calendar.JANUARY)
+            set(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val startMs = cal.timeInMillis
+        val now = System.currentTimeMillis()
+        dateRangeFlow.value = TransactionDateRange(startMs, now, "This Year")
+    }
+
     fun clearDateRange() {
         dateRangeFlow.value = null
     }

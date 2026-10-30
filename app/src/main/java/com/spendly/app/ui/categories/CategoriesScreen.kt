@@ -18,8 +18,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -33,6 +35,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,6 +47,7 @@ import com.spendly.app.core.components.SpendlyDetailTopBar
 import com.spendly.app.core.components.SpendlyDonutChart
 import com.spendly.app.core.components.SpendlyEmptyState
 import com.spendly.app.core.components.getCategoryIcon
+import com.spendly.app.core.theme.DarkNavyBackground
 import com.spendly.app.core.theme.ElectricLime
 import com.spendly.app.core.theme.PillShape
 import com.spendly.app.core.theme.SpendlyTheme
@@ -52,9 +57,11 @@ import java.util.Locale
 fun CategoriesScreen(
     viewModel: CategoriesViewModel,
     onBackClick: (() -> Unit)? = null,
+    onCategoryClick: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val colors = SpendlyTheme.colors
+    val haptic = LocalHapticFeedback.current
     val uiState by viewModel.uiState.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
 
@@ -70,11 +77,32 @@ fun CategoriesScreen(
                 title = "Categories",
                 onBackClick = onBackClick,
                 actions = {
-                    SpendlyButton(
-                        text = "+ Add",
-                        onClick = { showAddDialog = true },
-                        style = SpendlyButtonStyle.PRIMARY_LIME
-                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(PillShape)
+                            .background(if (colors.isDark) ElectricLime else Color(0xFF09142A))
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                showAddDialog = true
+                            }
+                            .padding(horizontal = 14.dp, vertical = 7.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Add Category",
+                                tint = if (colors.isDark) DarkNavyBackground else Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Add",
+                                style = SpendlyTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = if (colors.isDark) DarkNavyBackground else Color.White
+                            )
+                        }
+                    }
                 }
             )
         } else {
@@ -90,11 +118,32 @@ fun CategoriesScreen(
                     style = SpendlyTheme.typography.headlineLarge.copy(fontSize = 26.sp),
                     color = colors.textPrimary
                 )
-                SpendlyButton(
-                    text = "+ Add",
-                    onClick = { showAddDialog = true },
-                    style = SpendlyButtonStyle.PRIMARY_LIME
-                )
+                Box(
+                    modifier = Modifier
+                        .clip(PillShape)
+                        .background(if (colors.isDark) ElectricLime else Color(0xFF09142A))
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            showAddDialog = true
+                        }
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add Category",
+                            tint = if (colors.isDark) DarkNavyBackground else Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Add",
+                            style = SpendlyTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = if (colors.isDark) DarkNavyBackground else Color.White
+                        )
+                    }
+                }
             }
         }
 
@@ -181,7 +230,14 @@ fun CategoriesScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 10.dp),
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(colors.card)
+                                    .border(1.dp, colors.border, RoundedCornerShape(12.dp))
+                                    .clickable(enabled = onCategoryClick != null) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onCategoryClick?.invoke(cat.categoryName)
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
@@ -198,7 +254,7 @@ fun CategoriesScreen(
                                     Spacer(modifier = Modifier.width(14.dp))
                                     Text(
                                         text = cat.categoryName,
-                                        style = SpendlyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                                        style = SpendlyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                                         color = colors.textPrimary
                                     )
                                 }
@@ -206,17 +262,27 @@ fun CategoriesScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
                                         text = "${String.format(Locale.US, "%.0f", cat.percentage)}%",
-                                        style = SpendlyTheme.typography.bodyMedium,
+                                        style = SpendlyTheme.typography.labelSmall,
                                         color = colors.textSecondary
                                     )
-                                    Spacer(modifier = Modifier.width(20.dp))
+                                    Spacer(modifier = Modifier.width(14.dp))
                                     Text(
                                         text = cat.formattedAdaptive,
-                                        style = SpendlyTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        style = SpendlyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                         color = colors.textPrimary
                                     )
+                                    if (onCategoryClick != null) {
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Icon(
+                                            imageVector = Icons.Default.ChevronRight,
+                                            contentDescription = "View category transactions",
+                                            tint = colors.textMuted,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 }
                             }
+                            Spacer(modifier = Modifier.height(8.dp))
                         }
 
                         item {

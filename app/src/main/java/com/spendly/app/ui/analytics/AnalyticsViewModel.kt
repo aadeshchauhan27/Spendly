@@ -9,6 +9,7 @@ import com.spendly.app.domain.engine.InsightsEngine
 import com.spendly.app.domain.model.Transaction
 import com.spendly.app.domain.model.TransactionStatus
 import com.spendly.app.domain.model.TransactionType
+import com.spendly.app.domain.model.TrendPoint
 import com.spendly.app.domain.model.formatPaiseAdaptive
 import com.spendly.app.domain.model.formatPaiseLakhsSubtitle
 import com.spendly.app.domain.model.formatPaiseToRupees
@@ -50,6 +51,7 @@ data class AnalyticsUiState(
     val totalIncomePaise: Long = 0L,
     val spendChangePercent: Int = 0,
     val trendDataPoints: List<Float> = emptyList(),
+    val trendPoints: List<TrendPoint> = emptyList(),
     val trendAxisDates: List<String> = emptyList(),
     val categoryBreakdowns: List<CategorySpendBreakdown> = emptyList(),
     val insights: List<FinancialInsight> = emptyList(),
@@ -138,7 +140,7 @@ class AnalyticsViewModel(
             }
 
             // Generate trend line points & axis dates
-            val (points, dates) = computeTrendLine(expenses, startMs, endMs, daysInPeriod)
+            val (trendPointsList, dates) = computeTrendLine(expenses, startMs, endMs, daysInPeriod)
 
             // Generate Insights
             val insights = InsightsEngine.generateInsights(
@@ -156,7 +158,8 @@ class AnalyticsViewModel(
                 totalSpendingPaise = totalSpend,
                 totalIncomePaise = totalIncome,
                 spendChangePercent = changePercent,
-                trendDataPoints = points,
+                trendDataPoints = trendPointsList.map { it.amountRupees },
+                trendPoints = trendPointsList,
                 trendAxisDates = dates,
                 categoryBreakdowns = categoryBreakdowns,
                 insights = insights,
@@ -219,27 +222,36 @@ class AnalyticsViewModel(
         startMs: Long,
         endMs: Long,
         days: Int
-    ): Pair<List<Float>, List<String>> {
-        val bucketsCount = minOf(6, maxOf(4, days))
-        val bucketDuration = (endMs - startMs) / bucketsCount
-        val points = mutableListOf<Float>()
+    ): Pair<List<TrendPoint>, List<String>> {
+        val bucketsCount = minOf(10, maxOf(6, days))
+        val bucketDuration = (endMs - startMs) / bucketsCount.coerceAtLeast(1)
+        val trendPoints = mutableListOf<TrendPoint>()
         val dates = mutableListOf<String>()
-        val sdf = SimpleDateFormat("d MMM", Locale.ENGLISH)
+        val sdf = SimpleDateFormat("dd MMM", Locale("en", "IN"))
+        val fullSdf = SimpleDateFormat("dd MMM yyyy", Locale("en", "IN"))
 
         for (i in 0 until bucketsCount) {
             val bStart = startMs + (i * bucketDuration)
             val bEnd = bStart + bucketDuration
-            val bucketSpend = expenses.filter { it.timestampMs in bStart..bEnd }
+            val midTime = bStart + (bucketDuration / 2)
+            val bucketSpendPaise = expenses.filter { it.timestampMs in bStart..bEnd }
                 .sumOf { it.amountPaise }
-            points.add((bucketSpend / 100).toFloat())
-            dates.add(sdf.format(Date(bStart)))
+            val amountRupees = (bucketSpendPaise / 100).toFloat()
+            val dateLabel = sdf.format(Date(midTime))
+            val fullDate = fullSdf.format(Date(midTime))
+
+            trendPoints.add(
+                TrendPoint(
+                    amountRupees = amountRupees,
+                    dateLabel = dateLabel,
+                    fullDate = fullDate,
+                    timestampMs = midTime
+                )
+            )
+            dates.add(dateLabel)
         }
 
-        // Normalize points to 0f..1f range for bezier chart
-        val maxVal = points.maxOrNull()?.takeIf { it > 0f } ?: 1f
-        val normalized = points.map { it / maxVal }
-
-        return normalized to dates
+        return trendPoints to dates
     }
 
     class Factory(private val repository: SpendlyRepository) : ViewModelProvider.Factory {

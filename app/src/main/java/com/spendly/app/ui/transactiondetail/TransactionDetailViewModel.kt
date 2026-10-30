@@ -130,6 +130,22 @@ class TransactionDetailViewModel(
         }
     }
 
+    fun createAndAssignCategory(name: String, colorHex: String, iconName: String) {
+        viewModelScope.launch {
+            val newCategory = Category(
+                name = name.trim(),
+                type = "EXPENSE",
+                iconName = iconName,
+                colorHex = colorHex
+            )
+            val result = repository.insertCategory(newCategory)
+            val newId = result.getOrNull()
+            if (newId != null) {
+                applyCategoryChange(newId, applyToAll = false)
+            }
+        }
+    }
+
     fun deleteTransaction() {
         viewModelScope.launch {
             repository.deleteTransaction(transactionId)
