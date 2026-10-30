@@ -18,6 +18,8 @@ interface SpendlyRepository {
     suspend fun insertTransaction(transaction: Transaction): Result<Long>
     suspend fun updateTransaction(transaction: Transaction): Result<Unit>
     suspend fun deleteTransaction(id: Long): Result<Unit>
+    suspend fun countSimilarTransactions(excludeId: Long, counterpartyName: String, title: String): Int
+    suspend fun updateCategoryForSimilarTransactions(counterpartyName: String, title: String, newCategoryId: Long): Int
 
     fun getAllCategoriesFlow(): Flow<List<Category>>
     suspend fun insertCategory(category: Category): Result<Long>

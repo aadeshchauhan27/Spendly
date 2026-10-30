@@ -154,6 +154,14 @@ class SpendlyRepositoryImpl(
         return Result.success(Unit)
     }
 
+    override suspend fun countSimilarTransactions(excludeId: Long, counterpartyName: String, title: String): Int {
+        return transactionDao.countSimilarTransactions(excludeId, counterpartyName.trim(), title.trim())
+    }
+
+    override suspend fun updateCategoryForSimilarTransactions(counterpartyName: String, title: String, newCategoryId: Long): Int {
+        return transactionDao.updateCategoryForSimilarTransactions(counterpartyName.trim(), title.trim(), newCategoryId)
+    }
+
     override fun getAllCategoriesFlow(): Flow<List<Category>> {
         return categoryDao.getAllCategoriesFlow().map { list -> list.map { it.toDomain() } }
     }

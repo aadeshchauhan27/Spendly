@@ -7,6 +7,10 @@ import com.spendly.app.domain.model.Transaction
 import com.spendly.app.domain.model.TransactionDirection
 import com.spendly.app.domain.model.TransactionStatus
 import com.spendly.app.domain.model.TransactionType
+import com.spendly.app.domain.model.TrendPoint
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 object FinancialCalculationEngine {
 
@@ -100,41 +104,69 @@ object FinancialCalculationEngine {
         }.sortedByDescending { it.totalAmountPaise }
 
         // Build Trend Data Points (sub-intervals across period)
-        val trendPoints = generateTrendPoints(completedCurrent)
+            val trendPoints = generateTrendPoints(completedCurrent)
 
-        return DashboardSummary(
-            grossSpendingPaise = grossSpendingPaise,
-            refundsPaise = refundsPaise,
-            netSpendingPaise = netSpendingPaise,
-            qualifyingIncomePaise = qualifyingIncomePaise,
-            totalReceivedPaise = totalReceivedPaise,
-            netCashFlowPaise = netCashFlowPaise,
-            spendingChangePercent = spendingChangePercent,
-            trendDataPoints = trendPoints,
-            topCategories = categorySpendings,
-            recentTransactions = completedCurrent.filter { it.type != TransactionType.SPAM }.sortedByDescending { it.timestampMs }.take(10)
-        )
-    }
-
-    private fun generateTrendPoints(transactions: List<Transaction>, buckets: Int = 8): List<Float> {
-        val expenseTx = transactions.filter { it.type == TransactionType.EXPENSE }
-        if (expenseTx.isEmpty()) return listOf(0f, 0f)
-
-        val minTime = expenseTx.minOf { it.timestampMs }
-        val maxTime = expenseTx.maxOf { it.timestampMs }
-
-        if (minTime == maxTime) {
-            return listOf(expenseTx.sumOf { it.amountPaise } / 100f)
+            return DashboardSummary(
+                grossSpendingPaise = grossSpendingPaise,
+                refundsPaise = refundsPaise,
+                netSpendingPaise = netSpendingPaise,
+                qualifyingIncomePaise = qualifyingIncomePaise,
+                totalReceivedPaise = totalReceivedPaise,
+                netCashFlowPaise = netCashFlowPaise,
+                spendingChangePercent = spendingChangePercent,
+                trendPoints = trendPoints,
+                trendDataPoints = trendPoints.map { it.amountRupees },
+                topCategories = categorySpendings,
+                recentTransactions = completedCurrent.filter { it.type != TransactionType.SPAM }.sortedByDescending { it.timestampMs }
+            )
         }
 
-        val step = (maxTime - minTime) / buckets.coerceAtLeast(1)
-        val bucketAmounts = FloatArray(buckets) { 0f }
+        private fun generateTrendPoints(transactions: List<Transaction>, buckets: Int = 8): List<TrendPoint> {
+            val expenseTx = transactions.filter { it.type == TransactionType.EXPENSE }
+            val dateFormat = SimpleDateFormat("dd MMM", Locale("en", "IN"))
+            val fullDateFormat = SimpleDateFormat("dd MMM yyyy", Locale("en", "IN"))
 
-        expenseTx.forEach { tx ->
-            val bucketIndex = (((tx.timestampMs - minTime) / step).toInt()).coerceIn(0, buckets - 1)
-            bucketAmounts[bucketIndex] += (tx.amountPaise / 100f)
+            if (expenseTx.isEmpty()) {
+                val today = System.currentTimeMillis()
+                return listOf(
+                    TrendPoint(0f, dateFormat.format(Date(today - 86400000L * 3)), fullDateFormat.format(Date(today - 86400000L * 3))),
+                    TrendPoint(0f, dateFormat.format(Date(today)), fullDateFormat.format(Date(today)))
+                )
+            }
+
+            val minTime = expenseTx.minOf { it.timestampMs }
+            val maxTime = expenseTx.maxOf { it.timestampMs }
+
+            if (minTime == maxTime) {
+                val totalRupees = expenseTx.sumOf { it.amountPaise } / 100f
+                val dateLabel = dateFormat.format(Date(minTime))
+                val fullDate = fullDateFormat.format(Date(minTime))
+                return listOf(
+                    TrendPoint(totalRupees, dateLabel, fullDate),
+                    TrendPoint(totalRupees, dateLabel, fullDate)
+                )
+            }
+
+            val step = (maxTime - minTime) / buckets.coerceAtLeast(1)
+            val bucketAmounts = FloatArray(buckets) { 0f }
+            val bucketMidTimestamps = LongArray(buckets) { 0L }
+
+            for (i in 0 until buckets) {
+                bucketMidTimestamps[i] = minTime + (i * step) + (step / 2)
+            }
+
+            expenseTx.forEach { tx ->
+                val bucketIndex = (((tx.timestampMs - minTime) / step).toInt()).coerceIn(0, buckets - 1)
+                bucketAmounts[bucketIndex] += (tx.amountPaise / 100f)
+            }
+
+            return (0 until buckets).map { i ->
+                val time = bucketMidTimestamps[i]
+                TrendPoint(
+                    amountRupees = bucketAmounts[i],
+                    dateLabel = dateFormat.format(Date(time)),
+                    fullDate = fullDateFormat.format(Date(time))
+                )
+            }
         }
-
-        return bucketAmounts.toList()
-    }
 }

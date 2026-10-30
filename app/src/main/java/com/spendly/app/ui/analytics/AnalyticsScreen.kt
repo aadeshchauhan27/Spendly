@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.sp
 import com.spendly.app.core.components.SpendlyCard
 import com.spendly.app.core.components.SpendlyCategoryBadge
 import com.spendly.app.core.components.SpendlyChip
+import com.spendly.app.core.components.SpendlyDateRangeDialog
 import com.spendly.app.core.components.SpendlyProgressBar
 import com.spendly.app.core.components.SpendlyTransactionRow
 import com.spendly.app.core.components.SpendlyTrendLineChart
@@ -71,6 +72,7 @@ fun AnalyticsScreen(
     val periods = listOf("7D", "30D", "90D", "365D")
 
     var selectedCategoryBreakdown by remember { mutableStateOf<CategorySpendBreakdown?>(null) }
+    var showDateRangePicker by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     Column(
@@ -92,7 +94,8 @@ fun AnalyticsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             periods.forEach { period ->
                 SpendlyChip(
@@ -101,6 +104,19 @@ fun AnalyticsScreen(
                     onClick = { viewModel.setPeriod(period) }
                 )
             }
+
+            val isCustomActive = selectedPeriod == "Custom"
+            val customText = if (isCustomActive && uiState.customRangeLabel != null) {
+                "📅 ${uiState.customRangeLabel}"
+            } else {
+                "📅 Range"
+            }
+
+            SpendlyChip(
+                text = customText,
+                selected = isCustomActive,
+                onClick = { showDateRangePicker = true }
+            )
         }
 
         Spacer(modifier = Modifier.height(18.dp))
@@ -400,6 +416,14 @@ fun AnalyticsScreen(
             defaultColor
         }
         val timeFormat = SimpleDateFormat("dd MMM, hh:mm a", Locale("en", "IN"))
+        var sortOption by remember { mutableStateOf("Date") }
+        val sortedTransactions = remember(breakdown.transactions, sortOption) {
+            when (sortOption) {
+                "Largest" -> breakdown.transactions.sortedByDescending { it.amountPaise }
+                "Smallest" -> breakdown.transactions.sortedBy { it.amountPaise }
+                else -> breakdown.transactions.sortedByDescending { it.timestampMs }
+            }
+        }
 
         ModalBottomSheet(
             onDismissRequest = { selectedCategoryBreakdown = null },
@@ -438,9 +462,31 @@ fun AnalyticsScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                if (breakdown.transactions.isEmpty()) {
+                // Sort Options (Date, Largest, Smallest)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Sort:",
+                        style = SpendlyTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = colors.textSecondary
+                    )
+                    listOf("Date", "Largest", "Smallest").forEach { option ->
+                        SpendlyChip(
+                            text = option,
+                            selected = sortOption == option,
+                            onClick = { sortOption = option }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (sortedTransactions.isEmpty()) {
                     Text(
                         text = "No recorded transactions for this category in the selected period.",
                         style = SpendlyTheme.typography.bodyMedium,
@@ -452,7 +498,7 @@ fun AnalyticsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(breakdown.transactions) { tx ->
+                        items(sortedTransactions) { tx ->
                             SpendlyTransactionRow(
                                 title = tx.title,
                                 categoryName = tx.paymentMethod ?: tx.categoryName,
@@ -471,5 +517,16 @@ fun AnalyticsScreen(
                 }
             }
         }
+    }
+
+    if (showDateRangePicker) {
+        SpendlyDateRangeDialog(
+            initialStartDateMs = uiState.customRangeStartMs,
+            initialEndDateMs = uiState.customRangeEndMs,
+            onDismissRequest = { showDateRangePicker = false },
+            onDateRangeSelected = { startMs, endMs ->
+                viewModel.setCustomDateRange(startMs, endMs)
+            }
+        )
     }
 }

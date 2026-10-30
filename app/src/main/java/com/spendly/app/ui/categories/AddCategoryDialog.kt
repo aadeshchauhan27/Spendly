@@ -41,20 +41,24 @@ import com.spendly.app.core.components.AVAILABLE_CATEGORY_COLORS
 import com.spendly.app.core.components.AVAILABLE_CATEGORY_ICONS
 import com.spendly.app.core.components.SpendlyButton
 import com.spendly.app.core.components.SpendlyButtonStyle
+import com.spendly.app.core.components.SpendlyCategoryBadge
+import com.spendly.app.core.components.getCategoryIcon
 import com.spendly.app.core.theme.ElectricLime
 import com.spendly.app.core.theme.PillShape
 import com.spendly.app.core.theme.SpendlyTheme
+import com.spendly.app.domain.model.Category
 
 @Composable
 fun AddCategoryDialog(
+    initialCategory: Category? = null,
     onDismissRequest: () -> Unit,
     onConfirm: (name: String, type: String, colorHex: String, iconName: String) -> Unit
 ) {
     val colors = SpendlyTheme.colors
-    var name by remember { mutableStateOf("") }
-    var selectedType by remember { mutableStateOf("EXPENSE") }
-    var selectedColor by remember { mutableStateOf(AVAILABLE_CATEGORY_COLORS.first()) }
-    var selectedIconName by remember { mutableStateOf(AVAILABLE_CATEGORY_ICONS.first().first) }
+    var name by remember { mutableStateOf(initialCategory?.name ?: "") }
+    var selectedType by remember { mutableStateOf(initialCategory?.type ?: "EXPENSE") }
+    var selectedColor by remember { mutableStateOf(initialCategory?.colorHex ?: AVAILABLE_CATEGORY_COLORS.first()) }
+    var selectedIconName by remember { mutableStateOf(initialCategory?.iconName ?: AVAILABLE_CATEGORY_ICONS.first().first) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Dialog(onDismissRequest = onDismissRequest) {
@@ -72,10 +76,51 @@ fun AddCategoryDialog(
                     .verticalScroll(rememberScrollState())
             ) {
                 Text(
-                    text = "Create Category",
+                    text = if (initialCategory != null) "Edit Category" else "Create Category",
                     style = SpendlyTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = colors.textPrimary
                 )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Live Category Icon & Color Preview
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (colors.isDark) Color(0xFF132238) else Color(0xFFF1F5F9))
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        val selectedParsedColor = try {
+                            Color(android.graphics.Color.parseColor(selectedColor))
+                        } catch (e: Exception) {
+                            Color(0xFF546E7A)
+                        }
+                        val iconVector = AVAILABLE_CATEGORY_ICONS.firstOrNull { it.first == selectedIconName }?.second
+                            ?: getCategoryIcon(selectedIconName, name)
+
+                        SpendlyCategoryBadge(
+                            icon = iconVector,
+                            backgroundColor = selectedParsedColor,
+                            size = 56.dp,
+                            iconSize = 28.dp
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = name.ifBlank { "Category Name" },
+                            style = SpendlyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = colors.textPrimary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (selectedType == "EXPENSE") "Expense Category" else "Income Category",
+                            style = SpendlyTheme.typography.labelSmall,
+                            color = colors.textSecondary
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 

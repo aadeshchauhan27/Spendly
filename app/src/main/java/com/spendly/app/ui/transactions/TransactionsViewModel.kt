@@ -29,6 +29,12 @@ data class TransactionGroup(
     val transactions: List<Transaction>
 )
 
+data class TransactionDateRange(
+    val startMs: Long,
+    val endMs: Long,
+    val label: String
+)
+
 sealed interface TransactionsUiState {
     object Loading : TransactionsUiState
     data class Success(
@@ -36,6 +42,7 @@ sealed interface TransactionsUiState {
         val selectedCategory: String,
         val availableCategories: List<Category>,
         val groupedTransactions: List<TransactionGroup>,
+        val dateRange: TransactionDateRange? = null,
         val isEmpty: Boolean
     ) : TransactionsUiState
     data class Error(val message: String) : TransactionsUiState
@@ -47,13 +54,15 @@ class TransactionsViewModel(
 
     private val searchQueryFlow = MutableStateFlow("")
     private val selectedCategoryFlow = MutableStateFlow("All")
+    private val dateRangeFlow = MutableStateFlow<TransactionDateRange?>(null)
 
     val uiState: StateFlow<TransactionsUiState> = combine(
         repository.getAllTransactionsFlow(),
         repository.getAllCategoriesFlow(),
         searchQueryFlow,
-        selectedCategoryFlow
-    ) { allTransactions, categories, query, categoryFilter ->
+        selectedCategoryFlow,
+        dateRangeFlow
+    ) { allTransactions, categories, query, categoryFilter, dateRange ->
         val filtered = allTransactions.filter { tx ->
             val matchesQuery = query.isBlank() ||
                     tx.title.contains(query, ignoreCase = true) ||
@@ -67,7 +76,13 @@ class TransactionsViewModel(
                 tx.categoryName.equals(categoryFilter, ignoreCase = true)
             }
 
-            matchesQuery && matchesCategory
+            val matchesDate = if (dateRange != null) {
+                tx.timestampMs in dateRange.startMs..dateRange.endMs
+            } else {
+                true
+            }
+
+            matchesQuery && matchesCategory && matchesDate
         }
 
         val grouped = groupTransactionsByDay(filtered)
@@ -77,6 +92,7 @@ class TransactionsViewModel(
             selectedCategory = categoryFilter,
             availableCategories = categories,
             groupedTransactions = grouped,
+            dateRange = dateRange,
             isEmpty = allTransactions.isEmpty()
         )
     }.stateIn(
@@ -91,6 +107,16 @@ class TransactionsViewModel(
 
     fun onCategorySelect(category: String) {
         selectedCategoryFlow.value = category
+    }
+
+    fun setDateRange(startMs: Long, endMs: Long) {
+        val dateFormat = SimpleDateFormat("dd MMM", Locale("en", "IN"))
+        val label = "${dateFormat.format(Date(startMs))} - ${dateFormat.format(Date(endMs))}"
+        dateRangeFlow.value = TransactionDateRange(startMs, endMs, label)
+    }
+
+    fun clearDateRange() {
+        dateRangeFlow.value = null
     }
 
     fun deleteTransaction(id: Long) {

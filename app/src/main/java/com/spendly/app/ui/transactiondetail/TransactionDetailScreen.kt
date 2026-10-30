@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material.icons.filled.ChevronRight
@@ -52,6 +53,7 @@ import com.spendly.app.core.components.SpendlyChip
 import com.spendly.app.core.components.SpendlyDetailTopBar
 import com.spendly.app.core.components.SpendlyEmptyState
 import com.spendly.app.core.components.getCategoryIconAndColor
+import com.spendly.app.core.theme.ElectricLime
 import com.spendly.app.core.theme.PillShape
 import com.spendly.app.core.theme.SpendlyTheme
 import com.spendly.app.core.theme.StatusIncomeGreen
@@ -67,6 +69,7 @@ fun TransactionDetailScreen(
 ) {
     val colors = SpendlyTheme.colors
     val uiState by viewModel.uiState.collectAsState()
+    val recategorizePrompt by viewModel.recategorizePrompt.collectAsState()
 
     var showEditNotesDialog by remember { mutableStateOf(false) }
     var showCategoryDialog by remember { mutableStateOf(false) }
@@ -284,27 +287,66 @@ fun TransactionDetailScreen(
                     if (showCategoryDialog) {
                         AlertDialog(
                             onDismissRequest = { showCategoryDialog = false },
-                            title = { Text("Select Category", color = colors.textPrimary) },
+                            title = { 
+                                Text(
+                                    "Select Category", 
+                                    style = SpendlyTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                    color = colors.textPrimary 
+                                ) 
+                            },
                             text = {
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
                                     state.categories.forEach { cat ->
+                                        val isCurrent = cat.id == tx.categoryId
+                                        val (catIcon, defaultCatColor) = getCategoryIconAndColor(cat.name)
+                                        val catColor = try {
+                                            Color(android.graphics.Color.parseColor(cat.colorHex))
+                                        } catch (e: Exception) {
+                                            defaultCatColor
+                                        }
+
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .clip(PillShape)
-                                                .background(if (cat.id == tx.categoryId) colors.border else Color.Transparent)
+                                                .clip(RoundedCornerShape(14.dp))
+                                                .background(if (isCurrent) (if (colors.isDark) Color(0xFF192A4D) else Color(0xFFE2E8F0)) else Color.Transparent)
                                                 .clickable {
-                                                    viewModel.updateCategory(cat.id)
+                                                    viewModel.requestCategoryChange(cat)
                                                     showCategoryDialog = false
                                                 }
-                                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                                            verticalAlignment = Alignment.CenterVertically
+                                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
-                                            Text(
-                                                text = cat.name,
-                                                style = SpendlyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                                                color = colors.textPrimary
-                                            )
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                            ) {
+                                                SpendlyCategoryBadge(
+                                                    icon = catIcon,
+                                                    backgroundColor = catColor,
+                                                    size = 36.dp,
+                                                    iconSize = 18.dp
+                                                )
+                                                Text(
+                                                    text = cat.name,
+                                                    style = SpendlyTheme.typography.bodyMedium.copy(
+                                                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium
+                                                    ),
+                                                    color = colors.textPrimary
+                                                )
+                                            }
+
+                                            if (isCurrent) {
+                                                Text(
+                                                    text = "Current",
+                                                    style = SpendlyTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                    color = if (colors.isDark) ElectricLime else Color(0xFF1E88E5)
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -312,11 +354,57 @@ fun TransactionDetailScreen(
                             confirmButton = {},
                             dismissButton = {
                                 SpendlyButton(
-                                    text = "Close",
+                                    text = "Cancel",
                                     fullWidth = false,
                                     style = SpendlyButtonStyle.OUTLINE,
                                     onClick = { showCategoryDialog = false }
                                 )
+                            },
+                            containerColor = colors.card
+                        )
+                    }
+
+                    // Batch Recategorization Confirmation Prompt
+                    recategorizePrompt?.let { prompt ->
+                        AlertDialog(
+                            onDismissRequest = { viewModel.dismissRecategorizePrompt() },
+                            title = {
+                                Text(
+                                    text = "Update Similar Transactions?",
+                                    style = SpendlyTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                    color = colors.textPrimary
+                                )
+                            },
+                            text = {
+                                Text(
+                                    text = "We found ${prompt.similarCount} other transaction(s) from \"${prompt.merchantName}\". Would you like to categorize all of them as \"${prompt.newCategoryName}\"?",
+                                    style = SpendlyTheme.typography.bodyMedium,
+                                    color = colors.textSecondary
+                                )
+                            },
+                            confirmButton = {
+                                SpendlyButton(
+                                    text = "Apply to All (${prompt.similarCount + 1})",
+                                    fullWidth = false,
+                                    style = SpendlyButtonStyle.PRIMARY_LIME,
+                                    onClick = { viewModel.confirmRecategorization(applyToAll = true) }
+                                )
+                            },
+                            dismissButton = {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    SpendlyButton(
+                                        text = "Cancel",
+                                        fullWidth = false,
+                                        style = SpendlyButtonStyle.OUTLINE,
+                                        onClick = { viewModel.dismissRecategorizePrompt() }
+                                    )
+                                    SpendlyButton(
+                                        text = "Only This One",
+                                        fullWidth = false,
+                                        style = SpendlyButtonStyle.OUTLINE,
+                                        onClick = { viewModel.confirmRecategorization(applyToAll = false) }
+                                    )
+                                }
                             },
                             containerColor = colors.card
                         )

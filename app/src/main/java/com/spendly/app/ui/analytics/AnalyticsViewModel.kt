@@ -43,6 +43,9 @@ data class CategorySpendBreakdown(
 
 data class AnalyticsUiState(
     val period: String = "30D",
+    val customRangeStartMs: Long? = null,
+    val customRangeEndMs: Long? = null,
+    val customRangeLabel: String? = null,
     val totalSpendingPaise: Long = 0L,
     val totalIncomePaise: Long = 0L,
     val spendChangePercent: Int = 0,
@@ -66,11 +69,29 @@ class AnalyticsViewModel(
     private val _selectedPeriod = MutableStateFlow("30D")
     val selectedPeriod: StateFlow<String> = _selectedPeriod.asStateFlow()
 
-    val uiState: StateFlow<AnalyticsUiState> = _selectedPeriod.flatMapLatest { period ->
-        val (startMs, endMs, prevStartMs, prevEndMs, daysInPeriod) = computePeriodTimestamps(period)
+    private val _customDateRange = MutableStateFlow<Pair<Long, Long>?>(null)
+
+    val uiState: StateFlow<AnalyticsUiState> = combine(
+        _selectedPeriod,
+        _customDateRange
+    ) { period, customRange ->
+        Pair(period, customRange)
+    }.flatMapLatest { (period, customRange) ->
+        val window = computePeriodTimestamps(period, customRange)
+        val startMs = window.startMs
+        val endMs = window.endMs
+        val prevStartMs = window.prevStartMs
+        val prevEndMs = window.prevEndMs
+        val daysInPeriod = window.days
+
         val cal = Calendar.getInstance()
         val curYear = cal.get(Calendar.YEAR)
         val curMonth = cal.get(Calendar.MONTH) + 1
+
+        val customLabel = if (period == "Custom" && customRange != null) {
+            val sdf = SimpleDateFormat("dd MMM", Locale("en", "IN"))
+            "${sdf.format(Date(customRange.first))} - ${sdf.format(Date(customRange.second))}"
+        } else null
 
         combine(
             repository.getTransactionsBetweenFlow(startMs, endMs),
@@ -129,6 +150,9 @@ class AnalyticsViewModel(
 
             AnalyticsUiState(
                 period = period,
+                customRangeStartMs = customRange?.first,
+                customRangeEndMs = customRange?.second,
+                customRangeLabel = customLabel,
                 totalSpendingPaise = totalSpend,
                 totalIncomePaise = totalIncome,
                 spendChangePercent = changePercent,
@@ -149,6 +173,11 @@ class AnalyticsViewModel(
         _selectedPeriod.value = period
     }
 
+    fun setCustomDateRange(startMs: Long, endMs: Long) {
+        _customDateRange.value = Pair(startMs, endMs)
+        _selectedPeriod.value = "Custom"
+    }
+
     private data class PeriodWindow(
         val startMs: Long,
         val endMs: Long,
@@ -157,7 +186,17 @@ class AnalyticsViewModel(
         val days: Int
     )
 
-    private fun computePeriodTimestamps(period: String): PeriodWindow {
+    private fun computePeriodTimestamps(period: String, customRange: Pair<Long, Long>? = null): PeriodWindow {
+        if (period == "Custom" && customRange != null) {
+            val startMs = customRange.first
+            val endMs = customRange.second
+            val durationMs = (endMs - startMs).coerceAtLeast(86400000L)
+            val days = (durationMs / 86400000L).toInt().coerceAtLeast(1)
+            val prevStartMs = startMs - durationMs
+            val prevEndMs = startMs
+            return PeriodWindow(startMs, endMs, prevStartMs, prevEndMs, days)
+        }
+
         val now = System.currentTimeMillis()
         val oneDayMs = 24 * 60 * 60 * 1000L
         val days = when (period) {

@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.spendly.app.core.components.SpendlyChip
+import com.spendly.app.core.components.SpendlyDateRangeDialog
 import com.spendly.app.core.components.SpendlyEmptyState
 import com.spendly.app.core.components.SpendlyTransactionRow
 import com.spendly.app.core.components.getCategoryIconAndColor
@@ -71,6 +72,7 @@ fun TransactionsScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var showImportSheet by remember { mutableStateOf(false) }
     var showSmsSheet by remember { mutableStateOf(false) }
+    var showDateRangePicker by remember { mutableStateOf(false) }
 
     Box(
         modifier = modifier
@@ -237,7 +239,39 @@ fun TransactionsScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Date Range & Category Filter Controls
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        val isRangeActive = state.dateRange != null
+                        val rangeLabel = if (isRangeActive) "📅 ${state.dateRange!!.label}" else "📅 Date Range"
+
+                        SpendlyChip(
+                            text = rangeLabel,
+                            selected = isRangeActive,
+                            onClick = { showDateRangePicker = true }
+                        )
+
+                        if (isRangeActive) {
+                            Text(
+                                text = "Clear ✕",
+                                style = SpendlyTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = if (colors.isDark) ElectricLime else Color(0xFFDC2626),
+                                modifier = Modifier
+                                    .clip(PillShape)
+                                    .clickable { viewModel.clearDateRange() }
+                                    .padding(horizontal = 4.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     // Category Filter Chips
                     val categoryNames = listOf("All") + state.availableCategories.map { it.name }
@@ -360,6 +394,19 @@ fun TransactionsScreen(
             SmsSyncBottomSheet(
                 viewModel = smsSyncViewModel,
                 onDismissRequest = { showSmsSheet = false }
+            )
+        }
+
+        // Date Range Picker Dialog
+        if (showDateRangePicker) {
+            val stateSuccess = uiState as? TransactionsUiState.Success
+            SpendlyDateRangeDialog(
+                initialStartDateMs = stateSuccess?.dateRange?.startMs,
+                initialEndDateMs = stateSuccess?.dateRange?.endMs,
+                onDismissRequest = { showDateRangePicker = false },
+                onDateRangeSelected = { startMs, endMs ->
+                    viewModel.setDateRange(startMs, endMs)
+                }
             )
         }
     }

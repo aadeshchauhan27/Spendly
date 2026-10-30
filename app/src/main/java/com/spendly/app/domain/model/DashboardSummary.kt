@@ -1,5 +1,11 @@
 package com.spendly.app.domain.model
 
+data class TrendPoint(
+    val amountRupees: Float,
+    val dateLabel: String,
+    val fullDate: String = ""
+)
+
 data class DashboardSummary(
     val grossSpendingPaise: Long = 0L,
     val refundsPaise: Long = 0L,
@@ -8,6 +14,7 @@ data class DashboardSummary(
     val totalReceivedPaise: Long = 0L,
     val netCashFlowPaise: Long = 0L,
     val spendingChangePercent: Float? = null, // e.g. -12.0f for 12% decrease
+    val trendPoints: List<TrendPoint> = emptyList(),
     val trendDataPoints: List<Float> = emptyList(),
     val topCategories: List<CategorySpending> = emptyList(),
     val recentTransactions: List<Transaction> = emptyList()

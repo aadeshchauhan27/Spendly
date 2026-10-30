@@ -63,6 +63,24 @@ interface TransactionDao {
     @Query("DELETE FROM transactions WHERE amount_paise = 40158075 AND raw_identifier LIKE '%IDFCFB%'")
     suspend fun cleanupMiscalibratedIdfcLimit(): Int
 
+    @Query("""
+        SELECT COUNT(*) FROM transactions 
+        WHERE id != :excludeId 
+          AND (
+              (counterparty_name = :counterpartyName AND counterparty_name != '') 
+              OR (title = :title AND title != '')
+          )
+    """)
+    suspend fun countSimilarTransactions(excludeId: Long, counterpartyName: String, title: String): Int
+
+    @Query("""
+        UPDATE transactions 
+        SET category_id = :newCategoryId 
+        WHERE (counterparty_name = :counterpartyName AND counterparty_name != '') 
+           OR (title = :title AND title != '')
+    """)
+    suspend fun updateCategoryForSimilarTransactions(counterpartyName: String, title: String, newCategoryId: Long): Int
+
     @Query("DELETE FROM transactions")
     suspend fun clearAll()
 }

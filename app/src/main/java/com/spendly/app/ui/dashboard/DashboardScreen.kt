@@ -20,6 +20,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
@@ -71,7 +75,8 @@ fun DashboardScreen(
     val uiState by viewModel.uiState.collectAsState()
     val periods = listOf("7D", "30D", "90D", "365D")
     val context = LocalContext.current
-    var visibleRecentCount by remember { mutableStateOf(5) }
+    var visibleRecentCount by remember { mutableStateOf(10) }
+    val listState = rememberLazyListState()
 
     val hasSmsPermission = ContextCompat.checkSelfPermission(
         context,
@@ -81,6 +86,21 @@ fun DashboardScreen(
     LaunchedEffect(hasSmsPermission) {
         if (hasSmsPermission) {
             viewModel.syncTransactionsFromSms(context)
+        }
+    }
+
+    LaunchedEffect(listState, uiState) {
+        snapshotFlow {
+            val lastIdx = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
+            val total = listState.layoutInfo.totalItemsCount
+            Pair(lastIdx, total)
+        }.collect { (lastIdx, total) ->
+            val totalTxCount = (uiState as? DashboardUiState.Success)?.summary?.recentTransactions?.size ?: 0
+            if (lastIdx != null && total > 0 && lastIdx >= total - 2) {
+                if (visibleRecentCount < totalTxCount) {
+                    visibleRecentCount = minOf(visibleRecentCount + 10, totalTxCount)
+                }
+            }
         }
     }
 
@@ -192,6 +212,7 @@ fun DashboardScreen(
                     }
                 } else {
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 20.dp),
@@ -360,11 +381,19 @@ fun DashboardScreen(
 
                                     Spacer(modifier = Modifier.height(12.dp))
 
-                                    val trendData = state.summary.trendDataPoints.ifEmpty { listOf(0f, 0f) }
-                                    SpendlyTrendLineChart(
-                                        dataPoints = trendData,
-                                        lineColor = if (colors.isDark) ElectricLime else Color(0xFF09142A)
-                                    )
+                                    val trendPoints = state.summary.trendPoints
+                                    if (trendPoints.isNotEmpty()) {
+                                        SpendlyTrendLineChart(
+                                            points = trendPoints,
+                                            lineColor = if (colors.isDark) ElectricLime else Color(0xFF09142A)
+                                        )
+                                    } else {
+                                        val trendData = state.summary.trendDataPoints.ifEmpty { listOf(0f, 0f) }
+                                        SpendlyTrendLineChart(
+                                            dataPoints = trendData,
+                                            lineColor = if (colors.isDark) ElectricLime else Color(0xFF09142A)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -482,12 +511,25 @@ fun DashboardScreen(
 
                                     if (state.summary.recentTransactions.size > visibleRecentCount) {
                                         Spacer(modifier = Modifier.height(14.dp))
-                                        SpendlyButton(
-                                            text = "Load More (${state.summary.recentTransactions.size - visibleRecentCount} remaining)",
-                                            onClick = { visibleRecentCount += 5 },
-                                            style = SpendlyButtonStyle.OUTLINE,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 12.dp),
+                                            horizontalArrangement = Arrangement.Center,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(20.dp),
+                                                color = if (colors.isDark) ElectricLime else colors.textPrimary,
+                                                strokeWidth = 2.dp
+                                            )
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Text(
+                                                text = "Loading more transactions...",
+                                                style = SpendlyTheme.typography.bodySmall,
+                                                color = colors.textSecondary
+                                            )
+                                        }
                                     }
                                 }
                             }
