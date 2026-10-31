@@ -246,6 +246,7 @@ fun CategoriesScreen(
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     SpendlyCategoryBadge(
+                                        categoryName = cat.categoryName,
                                         icon = icon,
                                         backgroundColor = color,
                                         size = 38.dp,

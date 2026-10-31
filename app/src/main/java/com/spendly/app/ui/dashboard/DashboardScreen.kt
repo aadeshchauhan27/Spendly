@@ -500,7 +500,7 @@ fun DashboardScreen(
                                     val timeFormat = SimpleDateFormat("hh:mm a", Locale("en", "IN"))
 
                                     state.summary.recentTransactions.take(visibleRecentCount).forEach { tx ->
-                                        val (icon, defaultColor) = getCategoryIconAndColor(tx.categoryName)
+                                        val (icon, defaultColor) = getCategoryIconAndColor(tx.categoryName, tx.categoryIconName)
                                         val catColor = try {
                                             Color(android.graphics.Color.parseColor(tx.categoryColorHex))
                                         } catch (e: Exception) {
@@ -515,6 +515,7 @@ fun DashboardScreen(
                                             isIncoming = tx.isIncoming,
                                             icon = icon,
                                             iconBackground = catColor,
+                                            iconName = tx.categoryIconName,
                                             onClick = { onTransactionClick(tx.id) }
                                         )
                                     }

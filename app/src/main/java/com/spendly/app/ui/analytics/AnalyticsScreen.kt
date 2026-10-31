@@ -293,6 +293,7 @@ fun AnalyticsScreen(
                                                     modifier = Modifier.weight(1f)
                                                 ) {
                                                     SpendlyCategoryBadge(
+                                                        categoryName = cat.categoryName,
                                                         icon = icon,
                                                         backgroundColor = catColor,
                                                         size = 32.dp,
@@ -445,6 +446,7 @@ fun AnalyticsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     SpendlyCategoryBadge(
+                        categoryName = breakdown.categoryName,
                         icon = icon,
                         backgroundColor = catColor,
                         size = 46.dp,

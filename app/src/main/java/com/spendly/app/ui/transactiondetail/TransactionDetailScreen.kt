@@ -132,7 +132,7 @@ fun TransactionDetailScreen(
             }
             is TransactionDetailUiState.Success -> {
                 val tx = state.transaction
-                val (icon, defaultColor) = getCategoryIconAndColor(tx.categoryName)
+                val (icon, defaultColor) = getCategoryIconAndColor(tx.categoryName, tx.categoryIconName)
                 val badgeColor = try {
                     Color(android.graphics.Color.parseColor(tx.categoryColorHex))
                 } catch (e: Exception) {
@@ -158,6 +158,8 @@ fun TransactionDetailScreen(
                         Spacer(modifier = Modifier.height(16.dp))
 
                         SpendlyCategoryBadge(
+                            categoryName = tx.categoryName,
+                            iconName = tx.categoryIconName,
                             icon = icon,
                             backgroundColor = badgeColor,
                             size = 64.dp,
@@ -386,7 +388,7 @@ fun TransactionDetailScreen(
                                             )
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text(
-                                                text = "+ Create New Category",
+                                                text = "Create New Category",
                                                 style = SpendlyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                                                 color = if (colors.isDark) ElectricLime else colors.textPrimary
                                             )
@@ -397,7 +399,7 @@ fun TransactionDetailScreen(
 
                                     state.categories.forEach { cat ->
                                         val isCurrent = cat.id == tx.categoryId
-                                        val (catIcon, defaultCatColor) = getCategoryIconAndColor(cat.name)
+                                        val (catIcon, defaultCatColor) = getCategoryIconAndColor(cat.name, cat.iconName)
                                         val catColor = try {
                                             Color(android.graphics.Color.parseColor(cat.colorHex))
                                         } catch (e: Exception) {
@@ -423,6 +425,8 @@ fun TransactionDetailScreen(
                                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                                             ) {
                                                 SpendlyCategoryBadge(
+                                                    categoryName = cat.name,
+                                                    iconName = cat.iconName,
                                                     icon = catIcon,
                                                     backgroundColor = catColor,
                                                     size = 36.dp,

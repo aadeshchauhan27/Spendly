@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,8 +27,9 @@ fun SpendlyTransactionRow(
     amountText: String,
     timeText: String,
     isIncoming: Boolean,
-    icon: ImageVector,
-    iconBackground: Color,
+    icon: ImageVector = Icons.Default.Category,
+    iconBackground: Color = Color.Transparent,
+    iconName: String? = null,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {}
 ) {
@@ -39,6 +42,8 @@ fun SpendlyTransactionRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         SpendlyCategoryBadge(
+            categoryName = categoryName,
+            iconName = iconName,
             icon = icon,
             backgroundColor = iconBackground,
             size = 42.dp,

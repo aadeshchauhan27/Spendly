@@ -1,5 +1,6 @@
 package com.spendly.app.ui.categories
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,12 +34,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.spendly.app.core.components.AVAILABLE_CATEGORY_COLORS
-import com.spendly.app.core.components.AVAILABLE_CATEGORY_ICONS
+import com.spendly.app.core.components.CATEGORY_ICON_ITEMS
 import com.spendly.app.core.components.SpendlyButton
 import com.spendly.app.core.components.SpendlyButtonStyle
 import com.spendly.app.core.components.SpendlyCategoryBadge
@@ -58,7 +60,7 @@ fun AddCategoryDialog(
     var name by remember { mutableStateOf(initialCategory?.name ?: "") }
     var selectedType by remember { mutableStateOf(initialCategory?.type ?: "EXPENSE") }
     var selectedColor by remember { mutableStateOf(initialCategory?.colorHex ?: AVAILABLE_CATEGORY_COLORS.first()) }
-    var selectedIconName by remember { mutableStateOf(initialCategory?.iconName ?: AVAILABLE_CATEGORY_ICONS.first().first) }
+    var selectedIconName by remember { mutableStateOf(initialCategory?.iconName ?: CATEGORY_ICON_ITEMS.first().key) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Dialog(onDismissRequest = onDismissRequest) {
@@ -98,11 +100,9 @@ fun AddCategoryDialog(
                         } catch (e: Exception) {
                             Color(0xFF546E7A)
                         }
-                        val iconVector = AVAILABLE_CATEGORY_ICONS.firstOrNull { it.first == selectedIconName }?.second
-                            ?: getCategoryIcon(selectedIconName, name)
-
                         SpendlyCategoryBadge(
-                            icon = iconVector,
+                            categoryName = name,
+                            iconName = selectedIconName,
                             backgroundColor = selectedParsedColor,
                             size = 56.dp,
                             iconSize = 28.dp
@@ -202,29 +202,28 @@ fun AddCategoryDialog(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    items(AVAILABLE_CATEGORY_ICONS) { (iconKey, iconVector) ->
-                        val isSelected = selectedIconName == iconKey
-                        val iconBg = if (isSelected) ElectricLime else (if (colors.isDark) Color(0xFF162544) else Color(0xFFE2E8F0))
-                        val iconTint = if (isSelected) Color(0xFF08152E) else colors.textPrimary
+                    items(CATEGORY_ICON_ITEMS) { item ->
+                        val isSelected = selectedIconName == item.key
 
                         Box(
                             modifier = Modifier
-                                .size(44.dp)
+                                .size(48.dp)
                                 .clip(CircleShape)
-                                .background(iconBg)
                                 .border(
-                                    width = if (isSelected) 2.dp else 0.dp,
-                                    color = if (isSelected) ElectricLime else Color.Transparent,
+                                    width = if (isSelected) 2.5.dp else 1.dp,
+                                    color = if (isSelected) ElectricLime else colors.border,
                                     shape = CircleShape
                                 )
-                                .clickable { selectedIconName = iconKey },
+                                .clickable { selectedIconName = item.key }
+                                .padding(3.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = iconVector,
-                                contentDescription = iconKey,
-                                tint = iconTint,
-                                modifier = Modifier.size(22.dp)
+                            Image(
+                                painter = painterResource(id = item.drawableResId),
+                                contentDescription = item.label,
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
                             )
                         }
                     }

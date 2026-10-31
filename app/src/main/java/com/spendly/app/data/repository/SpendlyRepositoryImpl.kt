@@ -69,7 +69,8 @@ class SpendlyRepositoryImpl(
                 val cat = catMap[entity.categoryId]
                 entity.toDomain(
                     categoryName = cat?.name ?: "Others",
-                    categoryColorHex = cat?.colorHex ?: "#546E7A"
+                    categoryColorHex = cat?.colorHex ?: "#546E7A",
+                    categoryIconName = cat?.iconName ?: ""
                 )
             }
         }
@@ -85,7 +86,8 @@ class SpendlyRepositoryImpl(
                 val cat = catMap[entity.categoryId]
                 entity.toDomain(
                     categoryName = cat?.name ?: "Others",
-                    categoryColorHex = cat?.colorHex ?: "#546E7A"
+                    categoryColorHex = cat?.colorHex ?: "#546E7A",
+                    categoryIconName = cat?.iconName ?: ""
                 )
             }
         }
@@ -101,7 +103,8 @@ class SpendlyRepositoryImpl(
                 val cat = catMap[entity.categoryId]
                 entity.toDomain(
                     categoryName = cat?.name ?: "Others",
-                    categoryColorHex = cat?.colorHex ?: "#546E7A"
+                    categoryColorHex = cat?.colorHex ?: "#546E7A",
+                    categoryIconName = cat?.iconName ?: ""
                 )
             }
         }
@@ -112,7 +115,8 @@ class SpendlyRepositoryImpl(
         val cat = categoryDao.getCategoryById(entity.categoryId)
         return entity.toDomain(
             categoryName = cat?.name ?: "Others",
-            categoryColorHex = cat?.colorHex ?: "#546E7A"
+            categoryColorHex = cat?.colorHex ?: "#546E7A",
+            categoryIconName = cat?.iconName ?: ""
         )
     }
 

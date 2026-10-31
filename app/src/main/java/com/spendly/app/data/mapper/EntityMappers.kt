@@ -17,7 +17,11 @@ import com.spendly.app.domain.model.TransactionSource
 import com.spendly.app.domain.model.TransactionStatus
 import com.spendly.app.domain.model.TransactionType
 
-fun TransactionEntity.toDomain(categoryName: String = "", categoryColorHex: String = "#546E7A"): Transaction {
+fun TransactionEntity.toDomain(
+    categoryName: String = "",
+    categoryColorHex: String = "#546E7A",
+    categoryIconName: String = ""
+): Transaction {
     return Transaction(
         id = id,
         amountPaise = amountPaise,
@@ -30,6 +34,7 @@ fun TransactionEntity.toDomain(categoryName: String = "", categoryColorHex: Stri
         categoryId = categoryId,
         categoryName = categoryName,
         categoryColorHex = categoryColorHex,
+        categoryIconName = categoryIconName,
         timestampMs = timestampMs,
         paymentMethod = paymentMethod,
         paymentApp = paymentApp,

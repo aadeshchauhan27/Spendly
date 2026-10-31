@@ -435,7 +435,7 @@ fun TransactionsScreen(
                                 }
 
                                 items(group.transactions) { tx ->
-                                    val (icon, defaultColor) = getCategoryIconAndColor(tx.categoryName)
+                                    val (icon, defaultColor) = getCategoryIconAndColor(tx.categoryName, tx.categoryIconName)
                                     val catColor = try {
                                         Color(android.graphics.Color.parseColor(tx.categoryColorHex))
                                     } catch (e: Exception) {
@@ -450,6 +450,7 @@ fun TransactionsScreen(
                                         isIncoming = tx.isIncoming,
                                         icon = icon,
                                         iconBackground = catColor,
+                                        iconName = tx.categoryIconName,
                                         onClick = { onTransactionClick(tx.id) }
                                     )
                                 }

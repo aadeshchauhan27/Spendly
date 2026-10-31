@@ -45,6 +45,7 @@ data class Transaction(
     val categoryId: Long,
     val categoryName: String = "",
     val categoryColorHex: String = "#546E7A",
+    val categoryIconName: String = "",
     val timestampMs: Long,
     val paymentMethod: String = "UPI",
     val paymentApp: String? = "Google Pay",
