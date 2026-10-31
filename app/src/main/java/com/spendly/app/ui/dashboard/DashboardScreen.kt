@@ -516,6 +516,7 @@ fun DashboardScreen(
                                             icon = icon,
                                             iconBackground = catColor,
                                             iconName = tx.categoryIconName,
+                                            status = tx.status,
                                             onClick = { onTransactionClick(tx.id) }
                                         )
                                     }

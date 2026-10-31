@@ -114,22 +114,6 @@ fun SpendlyTrendLineChart(
                             }
                         )
                     }
-                    .pointerInput(points) {
-                        detectDragGestures(
-                            onDrag = { change, _ ->
-                                val padding = with(density) { 16.dp.toPx() }
-                                val width = size.width.toFloat()
-                                val stepX = (width - padding * 2) / (points.size - 1).coerceAtLeast(1)
-                                val draggedIdx = ((change.position.x - padding + stepX / 2f) / stepX)
-                                    .toInt()
-                                    .coerceIn(0, points.size - 1)
-                                if (selectedIndex != draggedIdx) {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    selectedIndex = draggedIdx
-                                }
-                            }
-                        )
-                    }
             ) {
                 val widthPx = with(density) { chartWidth.toPx() }
                 val heightPx = with(density) { containerMaxHeight.toPx() }

@@ -45,6 +45,12 @@ class DashboardViewModel(
     private val _syncMessage = MutableStateFlow("Analyzing UPI Transactions...")
     val syncMessage: StateFlow<String> = _syncMessage.asStateFlow()
 
+    init {
+        viewModelScope.launch {
+            repository.seedDemoData()
+        }
+    }
+
     val uiState: StateFlow<DashboardUiState> = combine(
         selectedPeriodFlow,
         _isSyncing,

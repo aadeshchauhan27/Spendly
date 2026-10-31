@@ -64,6 +64,24 @@ interface TransactionDao {
     suspend fun cleanupMiscalibratedIdfcLimit(): Int
 
     @Query("""
+        UPDATE transactions 
+        SET status = 'FAILED' 
+        WHERE status != 'FAILED'
+          AND (
+            title LIKE '%failed%' 
+            OR title LIKE '%declined%' 
+            OR title LIKE '%unsuccessful%' 
+            OR title LIKE '%autopay%' 
+            OR counterparty_name LIKE '%failed%' 
+            OR notes LIKE '%failed%' 
+            OR raw_identifier LIKE '%failed%' 
+            OR raw_identifier LIKE '%declined%' 
+            OR raw_identifier LIKE '%autopay%'
+          )
+    """)
+    suspend fun markFailedTransactions(): Int
+
+    @Query("""
         SELECT COUNT(*) FROM transactions 
         WHERE id != :excludeId 
           AND (

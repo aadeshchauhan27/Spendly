@@ -26,7 +26,9 @@ object FinancialCalculationEngine {
     fun calculateSummary(
         currentPeriodTransactions: List<Transaction>,
         previousPeriodTransactions: List<Transaction> = emptyList(),
-        categories: List<Category> = emptyList()
+        categories: List<Category> = emptyList(),
+        startMs: Long? = null,
+        endMs: Long? = null
     ): DashboardSummary {
         val completedCurrent = currentPeriodTransactions.filter { it.status == TransactionStatus.COMPLETED }
 
@@ -108,79 +110,94 @@ object FinancialCalculationEngine {
             )
         }.sortedByDescending { it.totalAmountPaise }
 
-        // Build Trend Data Points (sub-intervals across period)
-            val trendPoints = generateTrendPoints(completedCurrent)
+        // Build Trend Data Points for every day in the selected period window
+        val trendPoints = generateTrendPoints(
+            transactions = completedCurrent,
+            startMs = startMs,
+            endMs = endMs
+        )
 
-            return DashboardSummary(
-                grossSpendingPaise = grossSpendingPaise,
-                refundsPaise = refundsPaise,
-                netSpendingPaise = netSpendingPaise,
-                qualifyingIncomePaise = qualifyingIncomePaise,
-                totalReceivedPaise = totalReceivedPaise,
-                netCashFlowPaise = netCashFlowPaise,
-                spendingChangePercent = spendingChangePercent,
-                trendPoints = trendPoints,
-                trendDataPoints = trendPoints.map { it.amountRupees },
-                topCategories = categorySpendings,
-                recentTransactions = completedCurrent.filter { it.type != TransactionType.SPAM }.sortedByDescending { it.timestampMs }
-            )
+        return DashboardSummary(
+            grossSpendingPaise = grossSpendingPaise,
+            refundsPaise = refundsPaise,
+            netSpendingPaise = netSpendingPaise,
+            qualifyingIncomePaise = qualifyingIncomePaise,
+            totalReceivedPaise = totalReceivedPaise,
+            netCashFlowPaise = netCashFlowPaise,
+            spendingChangePercent = spendingChangePercent,
+            trendPoints = trendPoints,
+            trendDataPoints = trendPoints.map { it.amountRupees },
+            topCategories = categorySpendings,
+            recentTransactions = completedCurrent.filter { it.type != TransactionType.SPAM }.sortedByDescending { it.timestampMs }
+        )
+    }
+
+    private fun generateTrendPoints(
+        transactions: List<Transaction>,
+        startMs: Long? = null,
+        endMs: Long? = null
+    ): List<TrendPoint> {
+        val expenseTx = transactions.filter {
+            it.type == TransactionType.EXPENSE && it.status == TransactionStatus.COMPLETED
+        }
+        val dateFormat = SimpleDateFormat("dd MMM", Locale("en", "IN"))
+        val fullDateFormat = SimpleDateFormat("dd MMM yyyy", Locale("en", "IN"))
+        val dayKeyFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+
+        val now = endMs ?: System.currentTimeMillis()
+        val start = startMs ?: if (expenseTx.isNotEmpty()) expenseTx.minOf { it.timestampMs } else (now - 6 * 86400000L)
+
+        // Normalize calendar start to 00:00:00.000
+        val calStart = java.util.Calendar.getInstance().apply {
+            timeInMillis = start
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
         }
 
-        private fun generateTrendPoints(transactions: List<Transaction>, buckets: Int = 8): List<TrendPoint> {
-            val expenseTx = transactions.filter { it.type == TransactionType.EXPENSE }
-            val dateFormat = SimpleDateFormat("dd MMM", Locale("en", "IN"))
-            val fullDateFormat = SimpleDateFormat("dd MMM yyyy", Locale("en", "IN"))
+        // Normalize calendar end to 23:59:59.999
+        val calEnd = java.util.Calendar.getInstance().apply {
+            timeInMillis = now
+            set(java.util.Calendar.HOUR_OF_DAY, 23)
+            set(java.util.Calendar.MINUTE, 59)
+            set(java.util.Calendar.SECOND, 59)
+            set(java.util.Calendar.MILLISECOND, 999)
+        }
 
-            if (expenseTx.isEmpty()) {
-                val today = System.currentTimeMillis()
-                return listOf(
-                    TrendPoint(0f, dateFormat.format(Date(today - 86400000L * 3)), fullDateFormat.format(Date(today - 86400000L * 3)), today - 86400000L * 3),
-                    TrendPoint(0f, dateFormat.format(Date(today)), fullDateFormat.format(Date(today)), today)
-                )
-            }
+        val diffDays = (((calEnd.timeInMillis - calStart.timeInMillis) / 86400000L) + 1).toInt().coerceIn(1, 365)
 
-            val minTime = expenseTx.minOf { it.timestampMs }
-            val maxTime = expenseTx.maxOf { it.timestampMs }
+        // Sum completed expenses per calendar day
+        val dailySums = mutableMapOf<String, Float>()
+        expenseTx.forEach { tx ->
+            val dayKey = dayKeyFormat.format(Date(tx.timestampMs))
+            val cur = dailySums.getOrDefault(dayKey, 0f)
+            dailySums[dayKey] = cur + (tx.amountPaise / 100f)
+        }
 
-            if (minTime == maxTime) {
-                val totalRupees = expenseTx.sumOf { it.amountPaise } / 100f
-                val dateLabel = dateFormat.format(Date(minTime))
-                val fullDate = fullDateFormat.format(Date(minTime))
-                return listOf(
-                    TrendPoint(totalRupees, dateLabel, fullDate, minTime),
-                    TrendPoint(totalRupees, dateLabel, fullDate, minTime)
-                )
-            }
+        val cursorCal = java.util.Calendar.getInstance().apply { timeInMillis = calStart.timeInMillis }
+        val points = mutableListOf<TrendPoint>()
 
-            val spanDays = ((maxTime - minTime) / 86400000L).toInt()
-            val effectiveBuckets = when {
-                spanDays <= 7 -> 7
-                spanDays <= 30 -> 12
-                spanDays <= 90 -> 16
-                else -> 24
-            }.coerceAtLeast(buckets)
+        for (i in 0 until diffDays) {
+            val dayDate = cursorCal.time
+            val dayKey = dayKeyFormat.format(dayDate)
+            val dayStartMs = cursorCal.timeInMillis
+            val amount = dailySums[dayKey] ?: 0f
 
-            val step = (maxTime - minTime) / effectiveBuckets.coerceAtLeast(1)
-            val bucketAmounts = FloatArray(effectiveBuckets) { 0f }
-            val bucketMidTimestamps = LongArray(effectiveBuckets) { 0L }
-
-            for (i in 0 until effectiveBuckets) {
-                bucketMidTimestamps[i] = minTime + (i * step) + (step / 2)
-            }
-
-            expenseTx.forEach { tx ->
-                val bucketIndex = (((tx.timestampMs - minTime) / step).toInt()).coerceIn(0, effectiveBuckets - 1)
-                bucketAmounts[bucketIndex] += (tx.amountPaise / 100f)
-            }
-
-            return (0 until effectiveBuckets).map { i ->
-                val time = bucketMidTimestamps[i]
+            points.add(
                 TrendPoint(
-                    amountRupees = bucketAmounts[i],
-                    dateLabel = dateFormat.format(Date(time)),
-                    fullDate = fullDateFormat.format(Date(time)),
-                    timestampMs = time
+                    amountRupees = amount,
+                    dateLabel = dateFormat.format(dayDate),
+                    fullDate = fullDateFormat.format(dayDate),
+                    timestampMs = dayStartMs
                 )
-            }
+            )
+            cursorCal.add(java.util.Calendar.DAY_OF_YEAR, 1)
         }
+
+        return if (points.size >= 2) points else {
+            val p = points.firstOrNull() ?: TrendPoint(0f, dateFormat.format(Date(now)), fullDateFormat.format(Date(now)), now)
+            listOf(p, p)
+        }
+    }
 }

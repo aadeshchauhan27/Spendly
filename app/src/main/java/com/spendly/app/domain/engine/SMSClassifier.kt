@@ -483,12 +483,24 @@ object SMSClassifier {
     }
 
     fun isFailedTransaction(lower: String): Boolean {
-        return lower.contains("transaction failed") || lower.contains("payment failed") ||
-                lower.contains("upi transaction declined") || lower.contains("payment declined") ||
-                lower.contains("failed due to") || lower.contains("unsuccessful") ||
-                lower.contains("was not completed") || lower.contains("insufficient balance") ||
-                lower.contains("insufficient funds") || lower.contains("declined") ||
-                lower.contains("txn failed")
+        if (lower.contains("without fail")) return false
+        return lower.contains("failed") ||
+                lower.contains("failure") ||
+                lower.contains("declined") ||
+                lower.contains("decline") ||
+                lower.contains("unsuccessful") ||
+                lower.contains("was not completed") ||
+                lower.contains("could not be processed") ||
+                lower.contains("could not process") ||
+                lower.contains("could not be completed") ||
+                lower.contains("could not be debited") ||
+                lower.contains("insufficient balance") ||
+                lower.contains("insufficient funds") ||
+                lower.contains("bounced") ||
+                lower.contains("dishonoured") ||
+                lower.contains("dishonored") ||
+                lower.contains("returned unpaid") ||
+                lower.contains("rejected")
     }
 
     fun isReversalTransaction(lower: String): Boolean {

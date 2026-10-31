@@ -506,12 +506,14 @@ fun AnalyticsScreen(
                         items(sortedTransactions) { tx ->
                             SpendlyTransactionRow(
                                 title = tx.title,
-                                categoryName = tx.paymentMethod ?: tx.categoryName,
+                                categoryName = tx.categoryName,
                                 amountText = tx.formattedRupees.replace("₹", ""),
                                 timeText = timeFormat.format(Date(tx.timestampMs)),
                                 isIncoming = tx.isIncoming,
                                 icon = icon,
                                 iconBackground = catColor,
+                                iconName = tx.categoryIconName,
+                                status = tx.status,
                                 onClick = {
                                     selectedCategoryBreakdown = null
                                     onTransactionClick?.invoke(tx.id)

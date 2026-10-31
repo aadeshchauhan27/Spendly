@@ -68,6 +68,7 @@ import com.spendly.app.core.components.SpendlyChip
 import com.spendly.app.core.components.SpendlyDetailTopBar
 import com.spendly.app.core.components.SpendlyEmptyState
 import com.spendly.app.core.components.getCategoryIconAndColor
+import com.spendly.app.domain.model.TransactionStatus
 import com.spendly.app.core.theme.ElectricLime
 import com.spendly.app.core.theme.PillShape
 import com.spendly.app.core.theme.SpendlyTheme
@@ -182,12 +183,24 @@ fun TransactionDetailScreen(
 
                         Spacer(modifier = Modifier.height(18.dp))
 
-                        val prefix = if (tx.isIncoming) "+ " else "- "
-                        val amountColor = if (tx.isIncoming) StatusIncomeGreen else colors.textPrimary
+                        val isFailed = tx.status == TransactionStatus.FAILED
+                        val prefix = when {
+                            isFailed -> ""
+                            tx.isIncoming -> "+ "
+                            else -> "- "
+                        }
+                        val amountColor = when {
+                            isFailed -> colors.textMuted
+                            tx.isIncoming -> StatusIncomeGreen
+                            else -> colors.textPrimary
+                        }
 
                         Text(
-                            text = "$prefix${tx.formattedRupees}",
-                            style = SpendlyTheme.typography.displayLarge.copy(fontSize = 36.sp),
+                            text = if (isFailed) "${tx.formattedRupees} (Failed)" else "$prefix${tx.formattedRupees}",
+                            style = SpendlyTheme.typography.displayLarge.copy(
+                                fontSize = 36.sp,
+                                textDecoration = if (isFailed) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
+                            ),
                             color = amountColor
                         )
 
@@ -263,6 +276,13 @@ fun TransactionDetailScreen(
                                     .padding(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(14.dp)
                             ) {
+                                if (tx.status != com.spendly.app.domain.model.TransactionStatus.COMPLETED) {
+                                    DetailInfoRow(
+                                        label = "Status",
+                                        value = if (tx.status == com.spendly.app.domain.model.TransactionStatus.FAILED) "Failed (Not debited)" else tx.status.name
+                                    )
+                                    HorizontalDivider(color = colors.border.copy(alpha = 0.5f), thickness = 0.5.dp)
+                                }
                                 DetailInfoRow(label = "Payment Method", value = tx.paymentMethod)
                                 HorizontalDivider(color = colors.border.copy(alpha = 0.5f), thickness = 0.5.dp)
                                 DetailInfoRow(label = "UPI ID", value = tx.counterpartyUpiId ?: "N/A")

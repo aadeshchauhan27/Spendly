@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.dp
 import com.spendly.app.core.theme.SpendlyTheme
 import com.spendly.app.core.theme.StatusIncomeGreen
 
+import com.spendly.app.domain.model.TransactionStatus
+
 @Composable
 fun SpendlyTransactionRow(
     title: String,
@@ -30,6 +32,7 @@ fun SpendlyTransactionRow(
     icon: ImageVector = Icons.Default.Category,
     iconBackground: Color = Color.Transparent,
     iconName: String? = null,
+    status: TransactionStatus = TransactionStatus.COMPLETED,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {}
 ) {
@@ -66,11 +69,23 @@ fun SpendlyTransactionRow(
         }
 
         Column(horizontalAlignment = Alignment.End) {
-            val amountColor = if (isIncoming) StatusIncomeGreen else colors.textPrimary
-            val prefix = if (isIncoming) "+ " else "- "
+            val isFailed = status == TransactionStatus.FAILED
+            val amountColor = when {
+                isFailed -> colors.textMuted
+                isIncoming -> StatusIncomeGreen
+                else -> colors.textPrimary
+            }
+            val prefix = when {
+                isFailed -> ""
+                isIncoming -> "+ "
+                else -> "- "
+            }
             Text(
-                text = "$prefix$amountText",
-                style = SpendlyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                text = if (isFailed) "₹$amountText (Failed)" else "$prefix$amountText",
+                style = SpendlyTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    textDecoration = if (isFailed) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
+                ),
                 color = amountColor
             )
             Text(

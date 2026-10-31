@@ -312,7 +312,9 @@ class SpendlyRepositoryImpl(
             FinancialCalculationEngine.calculateSummary(
                 currentPeriodTransactions = currentTxs,
                 previousPeriodTransactions = prevTxs,
-                categories = categories
+                categories = categories,
+                startMs = startMs,
+                endMs = endMs
             )
         }
     }
@@ -322,6 +324,7 @@ class SpendlyRepositoryImpl(
         database.seedDefaultCategories()
         transactionDao.sanitizeSpamTransactions()
         transactionDao.cleanupMiscalibratedIdfcLimit()
+        transactionDao.markFailedTransactions()
     }
 
     override suspend fun batchInsertTransactions(
@@ -347,6 +350,7 @@ class SpendlyRepositoryImpl(
         }
 
         transactionDao.insertAll(entities)
+        transactionDao.markFailedTransactions()
 
         return ImportResultSummary(
             sessionId = sessionId,

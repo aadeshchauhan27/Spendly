@@ -363,21 +363,29 @@ fun UpiTransactionsScreen(
                 val timeFormat = SimpleDateFormat("dd MMM, hh:mm a", Locale("en", "IN"))
 
                 items(uiState.displayedTransactions) { tx ->
-                    val (icon, defaultColor) = getCategoryIconAndColor(tx.categoryName)
+                    val (icon, defaultColor) = getCategoryIconAndColor(tx.categoryName, tx.categoryIconName)
                     val catColor = try {
                         Color(android.graphics.Color.parseColor(tx.categoryColorHex))
                     } catch (e: Exception) {
                         defaultColor
                     }
 
+                    val categorySubtitle = if (!tx.paymentApp.isNullOrBlank()) {
+                        "${tx.categoryName} • ${tx.paymentApp}"
+                    } else {
+                        tx.categoryName
+                    }
+
                     SpendlyTransactionRow(
                         title = tx.title,
-                        categoryName = tx.paymentApp ?: tx.categoryName,
+                        categoryName = categorySubtitle,
                         amountText = tx.formattedRupees.replace("₹", ""),
                         timeText = timeFormat.format(Date(tx.timestampMs)),
                         isIncoming = tx.isIncoming,
                         icon = icon,
                         iconBackground = catColor,
+                        iconName = tx.categoryIconName,
+                        status = tx.status,
                         onClick = { onTransactionClick(tx.id) }
                     )
                 }
