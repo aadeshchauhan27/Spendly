@@ -257,6 +257,39 @@ class SMSClassifierTest {
     }
 
     @Test
+    fun noise_futureDebitsAndUpcomingMandates_areRejected() {
+        // e-mandate upcoming deduction
+        val mandate1 = "Ed mandate of Rss 199 will be decucted on 05-Nov for Netflix. Kindly maintain balance."
+        val result1 = SMSClassifier.classify("VK-HDFCBK", mandate1, availableCategories = categories)
+        assertFalse(result1.isFinancialTransaction)
+        assertEquals(NoiseCategory.BILL_PAYMENT_REMINDER, result1.noiseCategory)
+
+        // Upcoming mandate set for ... will be debited
+        val mandate2 = "for the upcoming mandate set for HOTSTAR .. INR 299 will be debited on 10-Nov"
+        val result2 = SMSClassifier.classify("AD-AXISBK", mandate2, availableCategories = categories)
+        assertFalse(result2.isFinancialTransaction)
+        assertEquals(NoiseCategory.BILL_PAYMENT_REMINDER, result2.noiseCategory)
+
+        // EMI will be debited reminder
+        val emiAlert = "Your EMI of Rs 5,000 will be debited on 05-Nov-2026. Keep sufficient balance in A/c ending 1234."
+        val result3 = SMSClassifier.classify("AD-KOTAKB", emiAlert, availableCategories = categories)
+        assertFalse(result3.isFinancialTransaction)
+        assertEquals(NoiseCategory.BILL_PAYMENT_REMINDER, result3.noiseCategory)
+
+        // Mandate setup/creation notification
+        val mandateCreated = "Your e-mandate for Rs 199 has been successfully created for Netflix."
+        val result4 = SMSClassifier.classify("VK-SBIINB", mandateCreated, availableCategories = categories)
+        assertFalse(result4.isFinancialTransaction)
+        assertEquals(NoiseCategory.BILL_PAYMENT_REMINDER, result4.noiseCategory)
+
+        // Autopay scheduled reminder
+        val autopayAlert = "Dear Customer, UPI autopay of Rs. 499 for Spotify is scheduled on 28-Oct. Ensure sufficient balance in A/c XX1234."
+        val result5 = SMSClassifier.classify("JM-ICICIB", autopayAlert, availableCategories = categories)
+        assertFalse(result5.isFinancialTransaction)
+        assertEquals(NoiseCategory.BILL_PAYMENT_REMINDER, result5.noiseCategory)
+    }
+
+    @Test
     fun noise_kycAndSecurityNotifications_areRejected() {
         val kyc = "KYC update required for your Bank account. Visit the nearest branch or update online."
         val result1 = SMSClassifier.classify("VK-SBIINB", kyc, availableCategories = categories)

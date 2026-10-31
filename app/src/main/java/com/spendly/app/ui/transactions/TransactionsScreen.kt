@@ -24,6 +24,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Search
@@ -266,122 +268,117 @@ fun TransactionsScreen(
                     )
                 }
                 is TransactionsUiState.Success -> {
-                    // Search Bar
-                    Box(
+                    // Unified Search & Date Filter Bar
+                    val hasDateFilter = state.dateRange != null
+
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 20.dp)
-                            .clip(PillShape)
-                            .background(colors.card)
-                            .border(1.dp, colors.border, PillShape)
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        contentAlignment = Alignment.CenterStart
+                            .padding(horizontal = 20.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = "Search",
-                                tint = colors.textMuted,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.size(10.dp))
-                            BasicTextField(
-                                value = state.searchQuery,
-                                onValueChange = { viewModel.onSearchQueryChange(it) },
-                                textStyle = SpendlyTheme.typography.bodyMedium.copy(color = colors.textPrimary),
-                                cursorBrush = SolidColor(colors.textPrimary),
-                                modifier = Modifier.fillMaxWidth(),
-                                decorationBox = { innerTextField ->
-                                    if (state.searchQuery.isEmpty()) {
-                                        Text(
-                                            text = "Search transactions...",
-                                            style = SpendlyTheme.typography.bodyMedium,
-                                            color = colors.textMuted
-                                        )
-                                    }
-                                    innerTextField()
-                                }
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Quick Date Filter Chips: All, 7D, 30D, 60D, 90D, This Year, Custom
-                    val currentRangeLabel = state.dateRange?.label
-                    val isCustom = state.dateRange != null && currentRangeLabel !in listOf("7D", "30D", "60D", "90D", "This Year")
-                    val customChipText = if (isCustom) "📅 $currentRangeLabel" else "📅 Custom"
-
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp)
-                    ) {
-                        item {
-                            SpendlyChip(
-                                text = "All Time",
-                                selected = state.dateRange == null,
-                                onClick = { viewModel.clearDateRange() }
-                            )
-                        }
-                        item {
-                            SpendlyChip(
-                                text = "7D",
-                                selected = currentRangeLabel == "7D",
-                                onClick = { viewModel.filterByPeriod(7) }
-                            )
-                        }
-                        item {
-                            SpendlyChip(
-                                text = "30D",
-                                selected = currentRangeLabel == "30D",
-                                onClick = { viewModel.filterByPeriod(30) }
-                            )
-                        }
-                        item {
-                            SpendlyChip(
-                                text = "60D",
-                                selected = currentRangeLabel == "60D",
-                                onClick = { viewModel.filterByPeriod(60) }
-                            )
-                        }
-                        item {
-                            SpendlyChip(
-                                text = "90D",
-                                selected = currentRangeLabel == "90D",
-                                onClick = { viewModel.filterByPeriod(90) }
-                            )
-                        }
-                        item {
-                            SpendlyChip(
-                                text = "This Year",
-                                selected = currentRangeLabel == "This Year",
-                                onClick = { viewModel.filterByThisYear() }
-                            )
-                        }
-                        item {
-                            SpendlyChip(
-                                text = customChipText,
-                                selected = isCustom,
-                                onClick = { showDateRangePicker = true }
-                            )
-                        }
-                        if (state.dateRange != null) {
-                            item {
-                                Text(
-                                    text = "Clear ✕",
-                                    style = SpendlyTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = if (colors.isDark) ElectricLime else Color(0xFFDC2626),
-                                    modifier = Modifier
-                                        .clip(PillShape)
-                                        .clickable { viewModel.clearDateRange() }
-                                        .padding(horizontal = 6.dp, vertical = 6.dp)
+                        // Search Bar Box
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(PillShape)
+                                .background(colors.card)
+                                .border(1.dp, colors.border, PillShape)
+                                .padding(horizontal = 14.dp, vertical = 11.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Search",
+                                    tint = colors.textMuted,
+                                    modifier = Modifier.size(18.dp)
                                 )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                BasicTextField(
+                                    value = state.searchQuery,
+                                    onValueChange = { viewModel.onSearchQueryChange(it) },
+                                    textStyle = SpendlyTheme.typography.bodyMedium.copy(color = colors.textPrimary),
+                                    cursorBrush = SolidColor(colors.textPrimary),
+                                    modifier = Modifier.weight(1f),
+                                    decorationBox = { innerTextField ->
+                                        if (state.searchQuery.isEmpty()) {
+                                            Text(
+                                                text = "Search transactions...",
+                                                style = SpendlyTheme.typography.bodyMedium,
+                                                color = colors.textMuted
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                )
+                                if (state.searchQuery.isNotEmpty()) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Clear search",
+                                        tint = colors.textMuted,
+                                        modifier = Modifier
+                                            .size(18.dp)
+                                            .clickable { viewModel.onSearchQueryChange("") }
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        // Calendar / Date Filter Button with Active Badge
+                        Box(
+                            modifier = Modifier
+                                .clip(PillShape)
+                                .background(if (hasDateFilter) (if (colors.isDark) ElectricLime else Color(0xFF09142A)) else colors.card)
+                                .border(
+                                    1.dp,
+                                    if (hasDateFilter) (if (colors.isDark) ElectricLime else Color(0xFF09142A)) else colors.border,
+                                    PillShape
+                                )
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    showDateRangePicker = true
+                                }
+                                .padding(horizontal = if (hasDateFilter) 12.dp else 12.dp, vertical = 11.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = "Filter by date",
+                                    tint = if (hasDateFilter) (if (colors.isDark) DarkNavyBackground else Color.White) else colors.textPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                if (hasDateFilter) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = state.dateRange?.label ?: "Filtered",
+                                        style = SpendlyTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = if (colors.isDark) DarkNavyBackground else Color.White
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Clear date filter",
+                                        tint = if (colors.isDark) DarkNavyBackground else Color.White,
+                                        modifier = Modifier
+                                            .size(14.dp)
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                viewModel.clearDateRange()
+                                            }
+                                    )
+                                }
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     // Category Filter Chips
                     val categoryNames = listOf("All") + state.availableCategories.map { it.name }
@@ -516,6 +513,9 @@ fun TransactionsScreen(
                 onDismissRequest = { showDateRangePicker = false },
                 onDateRangeSelected = { startMs, endMs ->
                     viewModel.setDateRange(startMs, endMs)
+                },
+                onClearDateRange = {
+                    viewModel.clearDateRange()
                 }
             )
         }

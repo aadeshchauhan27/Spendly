@@ -4,15 +4,18 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.spendly.app.data.local.dao.BudgetDao
 import com.spendly.app.data.local.dao.CategoryDao
+import com.spendly.app.data.local.dao.DeletedTransactionDao
 import com.spendly.app.data.local.dao.GoalContributionDao
 import com.spendly.app.data.local.dao.ImportSessionDao
 import com.spendly.app.data.local.dao.SavingsGoalDao
 import com.spendly.app.data.local.dao.TransactionDao
 import com.spendly.app.data.local.entity.BudgetEntity
 import com.spendly.app.data.local.entity.CategoryEntity
+import com.spendly.app.data.local.entity.DeletedTransactionEntity
 import com.spendly.app.data.local.entity.GoalContributionEntity
 import com.spendly.app.data.local.entity.ImportSessionEntity
 import com.spendly.app.data.local.entity.SavingsGoalEntity
@@ -28,9 +31,10 @@ import kotlinx.coroutines.launch
         BudgetEntity::class,
         SavingsGoalEntity::class,
         GoalContributionEntity::class,
-        ImportSessionEntity::class
+        ImportSessionEntity::class,
+        DeletedTransactionEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class SpendlyDatabase : RoomDatabase() {
@@ -41,10 +45,31 @@ abstract class SpendlyDatabase : RoomDatabase() {
     abstract fun savingsGoalDao(): SavingsGoalDao
     abstract fun goalContributionDao(): GoalContributionDao
     abstract fun importSessionDao(): ImportSessionDao
+    abstract fun deletedTransactionDao(): DeletedTransactionDao
 
     companion object {
         @Volatile
         private var INSTANCE: SpendlyDatabase? = null
+
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `deleted_transactions` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `bank_reference_num` TEXT,
+                        `raw_identifier` TEXT,
+                        `amount_paise` INTEGER NOT NULL,
+                        `timestamp_ms` INTEGER NOT NULL,
+                        `counterparty_name` TEXT NOT NULL,
+                        `sms_body` TEXT,
+                        `deleted_at_ms` INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_deleted_transactions_bank_reference_num` ON `deleted_transactions` (`bank_reference_num`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_deleted_transactions_raw_identifier` ON `deleted_transactions` (`raw_identifier`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_deleted_transactions_timestamp_ms` ON `deleted_transactions` (`timestamp_ms`)")
+            }
+        }
 
         fun getInstance(context: Context): SpendlyDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -53,6 +78,7 @@ abstract class SpendlyDatabase : RoomDatabase() {
                     SpendlyDatabase::class.java,
                     "spendly_database.db"
                 )
+                    .addMigrations(MIGRATION_1_2)
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)

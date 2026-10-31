@@ -97,9 +97,10 @@ class DashboardViewModel(
             try {
                 val categories = repository.getAllCategoriesFlow().first()
                 val existing = repository.getAllTransactionsFlow().first()
+                val deleted = repository.getAllDeletedTransactions()
 
                 _syncMessage.value = "Parsing and categorizing bank messages..."
-                val scanResult = SmsReader.scanInbox(context, existing, categories, maxDays = 365)
+                val scanResult = SmsReader.scanInbox(context, existing, categories, deletedTransactions = deleted, maxDays = 365)
                 val newTransactions = scanResult.items
                     .filter { it.isSelected && it.transaction != null }
                     .mapNotNull { it.transaction }

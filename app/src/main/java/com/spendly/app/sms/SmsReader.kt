@@ -3,6 +3,7 @@ package com.spendly.app.sms
 import android.content.Context
 import android.provider.Telephony
 import android.util.Log
+import com.spendly.app.data.local.entity.DeletedTransactionEntity
 import com.spendly.app.domain.engine.SMSTransactionParser
 import com.spendly.app.domain.engine.TransactionDeduplicator
 import com.spendly.app.domain.model.Category
@@ -44,6 +45,7 @@ object SmsReader {
         context: Context,
         existingTransactions: List<Transaction>,
         categories: List<Category>,
+        deletedTransactions: List<DeletedTransactionEntity> = emptyList(),
         maxDays: Int = 365
     ): SmsScanResult = withContext(Dispatchers.IO) {
         val items = mutableListOf<DetectedSmsItem>()
@@ -54,7 +56,7 @@ object SmsReader {
         var totalSpentPaise = 0L
         var totalIncomePaise = 0L
 
-        val dedupIndex = TransactionDeduplicator.Index(existingTransactions)
+        val dedupIndex = TransactionDeduplicator.Index(existingTransactions, deletedTransactions)
 
         val cutoffTimeMs = System.currentTimeMillis() - (maxDays * 24 * 60 * 60 * 1000L)
 
@@ -100,6 +102,11 @@ object SmsReader {
                     )
 
                     if (transaction != null) {
+                        if (dedupIndex.isDeleted(transaction)) {
+                            // User explicitly deleted this transaction previously. Permanently skip!
+                            continue
+                        }
+
                         totalFound++
                         val duplicate = dedupIndex.findDuplicate(transaction)
 

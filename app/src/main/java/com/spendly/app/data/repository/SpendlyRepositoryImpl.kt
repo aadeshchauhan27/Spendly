@@ -3,6 +3,7 @@ package com.spendly.app.data.repository
 import com.spendly.app.data.local.SpendlyDatabase
 import com.spendly.app.data.local.entity.BudgetEntity
 import com.spendly.app.data.local.entity.CategoryEntity
+import com.spendly.app.data.local.entity.DeletedTransactionEntity
 import com.spendly.app.data.local.entity.GoalContributionEntity
 import com.spendly.app.data.local.entity.ImportSessionEntity
 import com.spendly.app.data.local.entity.SavingsGoalEntity
@@ -44,6 +45,7 @@ class SpendlyRepositoryImpl(
     private val savingsGoalDao = database.savingsGoalDao()
     private val goalContributionDao = database.goalContributionDao()
     private val importSessionDao = database.importSessionDao()
+    private val deletedTransactionDao = database.deletedTransactionDao()
 
     init {
         CoroutineScope(Dispatchers.IO).launch {
@@ -150,8 +152,25 @@ class SpendlyRepositoryImpl(
     }
 
     override suspend fun deleteTransaction(id: Long): Result<Unit> {
+        val existing = transactionDao.getTransactionById(id)
+        if (existing != null) {
+            deletedTransactionDao.insert(
+                DeletedTransactionEntity(
+                    bankReferenceNum = existing.bankReferenceNum,
+                    rawIdentifier = existing.rawIdentifier,
+                    amountPaise = existing.amountPaise,
+                    timestampMs = existing.timestampMs,
+                    counterpartyName = existing.counterpartyName,
+                    smsBody = existing.tag
+                )
+            )
+        }
         transactionDao.deleteById(id)
         return Result.success(Unit)
+    }
+
+    override suspend fun getAllDeletedTransactions(): List<DeletedTransactionEntity> {
+        return deletedTransactionDao.getAllDeleted()
     }
 
     override suspend fun countSimilarTransactions(excludeId: Long, counterpartyName: String, title: String): Int {

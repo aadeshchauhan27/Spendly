@@ -1,5 +1,6 @@
 package com.spendly.app.data.repository
 
+import com.spendly.app.data.local.entity.DeletedTransactionEntity
 import com.spendly.app.domain.model.Budget
 import com.spendly.app.domain.model.Category
 import com.spendly.app.domain.model.DashboardSummary
@@ -18,6 +19,7 @@ interface SpendlyRepository {
     suspend fun insertTransaction(transaction: Transaction): Result<Long>
     suspend fun updateTransaction(transaction: Transaction): Result<Unit>
     suspend fun deleteTransaction(id: Long): Result<Unit>
+    suspend fun getAllDeletedTransactions(): List<DeletedTransactionEntity>
     suspend fun countSimilarTransactions(excludeId: Long, counterpartyName: String, title: String): Int
     suspend fun updateCategoryForSimilarTransactions(counterpartyName: String, title: String, newCategoryId: Long): Int
 

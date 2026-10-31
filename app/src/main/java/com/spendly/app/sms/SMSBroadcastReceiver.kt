@@ -48,11 +48,13 @@ class SMSBroadcastReceiver : BroadcastReceiver() {
                 val database = SpendlyDatabase.getInstance(context)
                 val categoryDao = database.categoryDao()
                 val transactionDao = database.transactionDao()
+                val deletedDao = database.deletedTransactionDao()
 
                 val categoryEntities = categoryDao.getAllCategoriesFlow().first()
                 val availableCategories = categoryEntities.map { it.toDomain() }
                 val existingTransactionEntities = transactionDao.getAllTransactionsFlow().first()
                 val existingTransactions = existingTransactionEntities.map { it.toDomain() }
+                val deletedTransactions = deletedDao.getAllDeleted()
 
                 for (sms in messages) {
                     val sender = sms.displayOriginatingAddress ?: sms.originatingAddress ?: ""
@@ -68,6 +70,11 @@ class SMSBroadcastReceiver : BroadcastReceiver() {
                     )
 
                     if (transaction != null) {
+                        if (TransactionDeduplicator.isDeletedTransaction(transaction, deletedTransactions)) {
+                            Log.d(TAG, "Transaction from $sender was previously deleted by user, permanently skipping.")
+                            continue
+                        }
+
                         val duplicate = TransactionDeduplicator.findDuplicate(transaction, existingTransactions)
 
                         if (duplicate != null) {

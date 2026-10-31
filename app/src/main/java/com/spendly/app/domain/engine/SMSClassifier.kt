@@ -78,33 +78,33 @@ object SMSClassifier {
             )
         }
 
-        // 2c. Bill & EMI Reminders / CC Bill Repayments (Settlement)
-        if (isBillReminderOrSettlement(lower)) {
-            return ClassificationResult(
-                isFinancialTransaction = false,
-                confidence = ClassificationConfidence.LOW,
-                noiseCategory = NoiseCategory.BILL_PAYMENT_REMINDER,
-                rejectionReason = "Bill payment reminder or credit card payment settlement"
-            )
-        }
-
-        // 2d. KYC / Account / Security Notifications
-        if (isKycOrSecurityAlert(lower)) {
-            return ClassificationResult(
-                isFinancialTransaction = false,
-                confidence = ClassificationConfidence.LOW,
-                noiseCategory = NoiseCategory.KYC_ACCOUNT_SECURITY,
-                rejectionReason = "KYC, account dispatch, or login alert notification"
-            )
-        }
-
-        // 2e. Investment / Financial Information (NAV, Stock, Portfolio)
+        // 2c. Investment / Financial Information (NAV, Stock, Portfolio, Scheduled SIP)
         if (isInvestmentInfo(lower)) {
             return ClassificationResult(
                 isFinancialTransaction = false,
                 confidence = ClassificationConfidence.LOW,
                 noiseCategory = NoiseCategory.INVESTMENT_INFO,
                 rejectionReason = "Mutual fund NAV, portfolio valuation, or scheduled SIP notice"
+            )
+        }
+
+        // 2d. Bill & EMI Reminders / Future Debits & Upcoming Mandates
+        if (isBillReminderOrSettlement(lower) || isFutureDebitOrMandate(lower)) {
+            return ClassificationResult(
+                isFinancialTransaction = false,
+                confidence = ClassificationConfidence.LOW,
+                noiseCategory = NoiseCategory.BILL_PAYMENT_REMINDER,
+                rejectionReason = "Bill payment reminder, upcoming mandate, or future scheduled debit notification"
+            )
+        }
+
+        // 2e. KYC / Account / Security Notifications
+        if (isKycOrSecurityAlert(lower)) {
+            return ClassificationResult(
+                isFinancialTransaction = false,
+                confidence = ClassificationConfidence.LOW,
+                noiseCategory = NoiseCategory.KYC_ACCOUNT_SECURITY,
+                rejectionReason = "KYC, account dispatch, or login alert notification"
             )
         }
 
@@ -382,6 +382,67 @@ object SMSClassifier {
         return hasDueLanguage && !hasCompletedDebit
     }
 
+    fun isFutureDebitOrMandate(lower: String): Boolean {
+        // 1. Direct future debit or deduction action verbs
+        if (lower.contains("will be debited") || lower.contains("will be deducted") ||
+            lower.contains("will be decucted") || // common Indian SMS typo
+            lower.contains("will be charged") || lower.contains("will be auto-debited") ||
+            lower.contains("will be auto debited") || lower.contains("will be autodebited") ||
+            lower.contains("will be presented") || lower.contains("will be processed") ||
+            lower.contains("shall be debited") || lower.contains("shall be deducted") ||
+            lower.contains("to be debited") || lower.contains("to be deducted") ||
+            lower.contains("scheduled to be debited") || lower.contains("scheduled for debit") ||
+            lower.contains("scheduled to debit") || lower.contains("scheduled debit") ||
+            lower.contains("scheduled for deduction")
+        ) {
+            return true
+        }
+
+        // 2. Upcoming Mandate, e-Mandate, SI, Autopay notifications
+        val hasMandateKeyword = lower.contains("mandate") || lower.contains("e-mandate") ||
+                lower.contains("e mandate") || lower.contains("ed mandate") ||
+                lower.contains("autopay") || lower.contains("auto-pay") ||
+                lower.contains("standing instruction") || lower.contains("si set")
+
+        if (hasMandateKeyword) {
+            val hasFutureContext = lower.contains("upcoming") || lower.contains("set for") ||
+                    lower.contains("is set") || lower.contains("has been set") ||
+                    lower.contains("created") || lower.contains("registered") ||
+                    lower.contains("scheduled") || lower.contains("notification") ||
+                    lower.contains("request") || lower.contains("alert") ||
+                    lower.contains("will be") || lower.contains("due") ||
+                    lower.contains("deducted on") || lower.contains("debited on") ||
+                    lower.contains("decucted on") || lower.contains("maintain")
+
+            if (hasFutureContext) {
+                val hasCompletedPastDebit = (lower.contains("has been debited") || lower.contains("debited towards") ||
+                        lower.contains("successfully debited")) &&
+                        !lower.contains("will be") && !lower.contains("upcoming") && !lower.contains("scheduled")
+                if (!hasCompletedPastDebit) {
+                    return true
+                }
+            }
+        }
+
+        // 3. Balance maintenance warnings for upcoming debits/mandates/EMIs
+        if (lower.contains("maintain sufficient balance") || lower.contains("ensure sufficient balance") ||
+            lower.contains("maintain balance") || lower.contains("keep sufficient balance") ||
+            lower.contains("keep balance in your") || lower.contains("maintain adequate balance")
+        ) {
+            return true
+        }
+
+        // 4. Scheduled on / for without actual completion
+        if ((lower.contains("scheduled on") || lower.contains("scheduled for")) &&
+            (lower.contains("debit") || lower.contains("deduct") || lower.contains("emi") || lower.contains("sip") || lower.contains("payment")) &&
+            !lower.contains("has been debited") && !lower.contains("successfully debited")
+        ) {
+            return true
+        }
+
+        return false
+    }
+
     fun isKycOrSecurityAlert(lower: String): Boolean {
         return lower.contains("kyc update") || lower.contains("update kyc") ||
                 lower.contains("kyc suspended") || lower.contains("kyc pending") ||
@@ -473,6 +534,7 @@ object SMSClassifier {
     }
 
     private fun hasDebitEventVerb(lower: String): Boolean {
+        if (isFutureDebitOrMandate(lower)) return false
         return lower.contains("debited") || lower.contains("debit of") || lower.contains("debit") ||
                 lower.contains("spent") || lower.contains("paid") || lower.contains("payment") ||
                 lower.contains("transferred") || lower.contains("withdrawn") ||
