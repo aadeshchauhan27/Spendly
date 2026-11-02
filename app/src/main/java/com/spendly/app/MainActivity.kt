@@ -65,7 +65,9 @@ class MainActivity : ComponentActivity() {
                         navController = navController,
                         userPreferences = container.userPreferences,
                         repository = container.repository,
-                        currentTheme = currentTheme
+                        currentTheme = currentTheme,
+                        authManager = container.authManager,
+                        cloudSyncManager = container.cloudSyncManager
                     )
                 }
             }

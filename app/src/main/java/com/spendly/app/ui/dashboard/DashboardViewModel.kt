@@ -59,21 +59,58 @@ class DashboardViewModel(
         Triple(period, isSyncing, syncMessage)
     }.flatMapLatest { (period, isSyncing, syncMessage) ->
         val now = System.currentTimeMillis()
-        val durationMs = when (period) {
-            "7D" -> 7 * 24 * 60 * 60 * 1000L
-            "30D" -> 30 * 24 * 60 * 60 * 1000L
-            "90D", "3M" -> 90 * 24 * 60 * 60 * 1000L
-            "365D", "1Y" -> 365 * 24 * 60 * 60 * 1000L
-            else -> 7 * 24 * 60 * 60 * 1000L
+        val calStart = java.util.Calendar.getInstance()
+        val startMs = when (period) {
+            "7D" -> {
+                calStart.timeInMillis = now - 7 * 24 * 60 * 60 * 1000L
+                calStart.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                calStart.set(java.util.Calendar.MINUTE, 0)
+                calStart.set(java.util.Calendar.SECOND, 0)
+                calStart.set(java.util.Calendar.MILLISECOND, 0)
+                calStart.timeInMillis
+            }
+            "30D" -> {
+                calStart.timeInMillis = now - 30 * 24 * 60 * 60 * 1000L
+                calStart.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                calStart.set(java.util.Calendar.MINUTE, 0)
+                calStart.set(java.util.Calendar.SECOND, 0)
+                calStart.set(java.util.Calendar.MILLISECOND, 0)
+                calStart.timeInMillis
+            }
+            "This Month", "Month" -> {
+                calStart.timeInMillis = now
+                calStart.set(java.util.Calendar.DAY_OF_MONTH, 1)
+                calStart.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                calStart.set(java.util.Calendar.MINUTE, 0)
+                calStart.set(java.util.Calendar.SECOND, 0)
+                calStart.set(java.util.Calendar.MILLISECOND, 0)
+                calStart.timeInMillis
+            }
+            "90D", "3M" -> {
+                calStart.timeInMillis = now - 90 * 24 * 60 * 60 * 1000L
+                calStart.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                calStart.set(java.util.Calendar.MINUTE, 0)
+                calStart.set(java.util.Calendar.SECOND, 0)
+                calStart.set(java.util.Calendar.MILLISECOND, 0)
+                calStart.timeInMillis
+            }
+            "365D", "1Y" -> {
+                calStart.timeInMillis = now - 365 * 24 * 60 * 60 * 1000L
+                calStart.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                calStart.set(java.util.Calendar.MINUTE, 0)
+                calStart.set(java.util.Calendar.SECOND, 0)
+                calStart.set(java.util.Calendar.MILLISECOND, 0)
+                calStart.timeInMillis
+            }
+            else -> {
+                calStart.timeInMillis = now - 7 * 24 * 60 * 60 * 1000L
+                calStart.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                calStart.set(java.util.Calendar.MINUTE, 0)
+                calStart.set(java.util.Calendar.SECOND, 0)
+                calStart.set(java.util.Calendar.MILLISECOND, 0)
+                calStart.timeInMillis
+            }
         }
-        val calStart = java.util.Calendar.getInstance().apply {
-            timeInMillis = now - durationMs
-            set(java.util.Calendar.HOUR_OF_DAY, 0)
-            set(java.util.Calendar.MINUTE, 0)
-            set(java.util.Calendar.SECOND, 0)
-            set(java.util.Calendar.MILLISECOND, 0)
-        }
-        val startMs = calStart.timeInMillis
 
         combine(
             repository.getDashboardSummaryFlow(startMs, now),

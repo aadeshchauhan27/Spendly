@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.TrendingUp
@@ -78,51 +79,63 @@ fun OnboardingScreen(
 
     val slides = listOf(
         OnboardingSlide(
-            badge = "100% PRIVATE & LOCAL",
-            title = "All Your Data Stays On Your Phone",
-            description = "Spendly has zero cloud servers, zero telemetry, and never uploads your personal SMS. Everything is processed and stored strictly on-device.",
+            badge = "100% PRIVATE & ON-DEVICE",
+            title = "All Your Data Stays Secure On Your Phone",
+            description = "Spendly processes all your financial SMS messages strictly on-device. No passwords or OTPs are ever touched, and your financial data is completely private.",
             icon = Icons.Default.Lock,
             iconColor = ElectricLime,
             featurePoints = listOf(
                 "Local-only encrypted Room database",
-                "Zero cloud sync & no user logins required",
-                "Completely private financial tracking"
+                "Zero telemetry & zero SMS upload",
+                "Completely private on-device processing"
             )
         ),
         OnboardingSlide(
             badge = "INTELLIGENT NOISE FILTER",
-            title = "No OTPs, No Loan Offers, No Spam",
-            description = "Spendly's financial engine strictly filters out OTP passwords, loan advertisements, credit limit offers, and order notifications. Only real money spent is counted.",
+            title = "No OTPs, No Mandates, No Spam",
+            description = "Spendly's financial engine rigorously filters out OTP passwords, loan advertisements, upcoming mandate reminders, and credit limit offers. Only real money spent is counted.",
             icon = Icons.Default.Shield,
             iconColor = Color(0xFF38BDF8),
             featurePoints = listOf(
                 "Strict OTP & 2FA authentication exclusion",
-                "Aggressive rejection of pre-approved loan spam",
-                "Only real debits & credits recorded"
+                "Auto-rejects upcoming mandate alerts until debited",
+                "Aggressive rejection of pre-approved loan spam"
             )
         ),
         OnboardingSlide(
             badge = "MULTI-BANK & UPI TRACKER",
             title = "Instant UPI & Bank Spend Tracking",
-            description = "Auto-detects spends across HDFC, SBI, Axis, ICICI, GPay, PhonePe, Paytm, CRED, and Kiwi. Merchants like Swiggy, Amazon, and Uber are categorized in real-time.",
+            description = "Auto-detects spends across HDFC, SBI, Axis, ICICI, AU Bank, GPay, PhonePe, Paytm, and CRED. Merchants like Swiggy, Amazon, and Uber are categorized in real-time.",
             icon = Icons.Default.AccountBalance,
             iconColor = Color(0xFFA78BFA),
             featurePoints = listOf(
                 "Automated merchant name normalization",
-                "Smart category badging with custom icons",
+                "Smart category badging with custom 3D icons",
                 "Comprehensive UPI, Card & NetBanking support"
             )
         ),
         OnboardingSlide(
             badge = "FINANCIAL INTELLIGENCE",
             title = "Deep Spending Trends & Category Drills",
-            description = "Explore interactive daily trend charts, 7D/30D/90D/365D views, clickable day filters, and bank-wise UPI distribution with zero manual effort.",
+            description = "Explore interactive daily trend charts, 7D/30D/This Month/90D views, clickable day filters, and bank-wise UPI distribution with zero manual effort.",
             icon = Icons.Default.TrendingUp,
             iconColor = Color(0xFF34D399),
             featurePoints = listOf(
                 "Interactive clickable daily trend graph",
-                "Drill into category spends with instant sorting",
+                "Clickable Total Spends & Income cards",
                 "Bank-wise UPI breakdown and insights"
+            )
+        ),
+        OnboardingSlide(
+            badge = "OPTIONAL CLOUD RECOVERY",
+            title = "Google Cloud Backup & 1-Tap Recovery",
+            description = "Opt in anytime to safely back up your transactions, custom categories, and budgets to your personal Google Firestore account. Fully recoverable when switching devices.",
+            icon = Icons.Default.CloudSync,
+            iconColor = Color(0xFF38BDF8),
+            featurePoints = listOf(
+                "Native 1-tap Google Sign-In",
+                "Strictly opt-in for 100% privacy control",
+                "Instant cross-device restore & backup"
             )
         )
     )

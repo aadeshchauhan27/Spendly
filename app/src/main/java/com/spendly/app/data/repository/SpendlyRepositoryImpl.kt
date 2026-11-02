@@ -56,6 +56,8 @@ class SpendlyRepositoryImpl(
                 database.seedDefaultCategories()
                 transactionDao.sanitizeSpamTransactions()
                 transactionDao.cleanupMiscalibratedIdfcLimit()
+                transactionDao.cleanupUpcomingMandates()
+                transactionDao.cleanupMisclassifiedCred()
             } catch (e: Exception) {
                 // Silently handle
             }
@@ -327,6 +329,8 @@ class SpendlyRepositoryImpl(
         database.seedDefaultCategories()
         transactionDao.sanitizeSpamTransactions()
         transactionDao.cleanupMiscalibratedIdfcLimit()
+        transactionDao.cleanupUpcomingMandates()
+        transactionDao.cleanupMisclassifiedCred()
         transactionDao.markFailedTransactions()
         cleanupDuplicateTransactions()
     }
@@ -454,6 +458,10 @@ class SpendlyRepositoryImpl(
         transactionDao.clearDemoTransactions()
         budgetDao.clearDemoBudgets()
         savingsGoalDao.clearDemoGoals()
+    }
+
+    override suspend fun clearAllTransactions() {
+        transactionDao.clearAll()
     }
 
     override suspend fun insertTransactionFromSMS(sender: String, content: String): Result<Long> {

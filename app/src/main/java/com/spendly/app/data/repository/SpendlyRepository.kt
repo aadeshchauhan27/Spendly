@@ -56,4 +56,5 @@ interface SpendlyRepository {
 
     suspend fun seedDemoData()
     suspend fun clearDemoData()
+    suspend fun clearAllTransactions()
 }

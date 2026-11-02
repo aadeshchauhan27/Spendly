@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "807901486310",
+    "project_id": "phone-doc-912df",
+    "storage_bucket": "phone-doc-912df.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:807901486310:android:895278c823d16511c92f27",
+        "android_client_info": {
+          "package_name": "com.spendly.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "807901486310-167s2phmms20etqlhpsurar1krt31ud0.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAiYH2Mz0x-W4vZKQmGWjSrcZMortM3V00"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "807901486310-167s2phmms20etqlhpsurar1krt31ud0.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

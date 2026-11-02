@@ -403,7 +403,9 @@ object SMSClassifier {
         val hasMandateKeyword = lower.contains("mandate") || lower.contains("e-mandate") ||
                 lower.contains("e mandate") || lower.contains("ed mandate") ||
                 lower.contains("autopay") || lower.contains("auto-pay") ||
-                lower.contains("standing instruction") || lower.contains("si set")
+                lower.contains("standing instruction") || lower.contains("si set") ||
+                lower.contains("pause mandate") || lower.contains("to stop execution") ||
+                lower.contains("upcoming mandate") || lower.contains("merchantmandate")
 
         if (hasMandateKeyword) {
             val hasFutureContext = lower.contains("upcoming") || lower.contains("set for") ||
@@ -413,12 +415,15 @@ object SMSClassifier {
                     lower.contains("request") || lower.contains("alert") ||
                     lower.contains("will be") || lower.contains("due") ||
                     lower.contains("deducted on") || lower.contains("debited on") ||
-                    lower.contains("decucted on") || lower.contains("maintain")
+                    lower.contains("decucted on") || lower.contains("maintain") ||
+                    lower.contains("pause mandate") || lower.contains("to stop execution") ||
+                    lower.contains("merchantmandate")
 
             if (hasFutureContext) {
                 val hasCompletedPastDebit = (lower.contains("has been debited") || lower.contains("debited towards") ||
                         lower.contains("successfully debited")) &&
-                        !lower.contains("will be") && !lower.contains("upcoming") && !lower.contains("scheduled")
+                        !lower.contains("will be") && !lower.contains("upcoming") && !lower.contains("scheduled") &&
+                        !lower.contains("pause mandate") && !lower.contains("set for")
                 if (!hasCompletedPastDebit) {
                     return true
                 }
@@ -736,7 +741,7 @@ object SMSClassifier {
         val prepPattern = if (direction == TransactionDirection.OUTGOING) {
             Pattern.compile("(?i)(?:towards|to|at|info:|for)\\s+([A-Za-z0-9&.\\s]+?)(?:\\s+for\\s+(?:rs|inr|₹)|\\s+on\\s+\\d{1,2}[-/]|\\s+via|\\s+using|\\s+upi|\\s+ref|\\s+avl|\\s+bal|\\.|$)")
         } else {
-            Pattern.compile("(?i)(?:from|by)\\s+([A-Za-z0-9&.\\s]+?)(?:\\s+on|\\s+via|\\s+using|\\s+upi|\\s+ref|\\s+avl|\\s+bal|\\.|$)")
+            Pattern.compile("(?i)(?:from|by|transfer from|received from|sent by)\\s+([A-Za-z0-9&.\\s]+?)(?:\\s+on|\\s+via|\\s+using|\\s+upi|\\s+ref|\\s+avl|\\s+bal|\\.|$)")
         }
 
         val prepMatcher = prepPattern.matcher(content)
@@ -748,7 +753,7 @@ object SMSClassifier {
             }
         }
 
-        // 5. Fallback: Match Known Indian Merchants in text
+        // 5. Fallback: Match Known Indian Merchants in text with word boundaries
         val knownMerchants = listOf(
             "Swiggy", "Zomato", "Starbucks", "Blinkit", "Zepto", "Instamart", "Bigbasket",
             "Amazon", "Flipkart", "Myntra", "Meesho", "Nykaa", "Tata Cliq", "Ajio", "Zara",
@@ -760,7 +765,15 @@ object SMSClassifier {
         )
 
         for (merchant in knownMerchants) {
-            if (content.contains(merchant, ignoreCase = true)) {
+            // Strict word boundary to prevent 'CRED' matching 'credit' or 'credited'
+            val merchantPattern = Pattern.compile("(?i)\\b${Pattern.quote(merchant)}\\b")
+            if (merchantPattern.matcher(content).find()) {
+                // For incoming direction, do NOT match CRED unless explicitly "CRED Cash" or "CRED Refund"
+                if (merchant.equals("CRED", ignoreCase = true) && direction == TransactionDirection.INCOMING) {
+                    if (!content.contains("cred cash", ignoreCase = true) && !content.contains("cred refund", ignoreCase = true)) {
+                        continue
+                    }
+                }
                 return merchant
             }
         }
@@ -775,10 +788,14 @@ object SMSClassifier {
 
         if (cleaned.matches(Regex("^[0-9+\\s-]+$"))) return ""
         val lower = cleaned.lowercase(Locale.ENGLISH)
-        if (lower in listOf("queries", "customer", "help", "support", "dispute", "information", "details", "request", "account", "card", "credit card")) {
+        if (lower in listOf(
+            "queries", "customer", "help", "support", "dispute", "information",
+            "details", "request", "account", "card", "credit card", "credit", "credited",
+            "debit", "debited", "upi", "vpa", "bank", "mandate", "rs", "inr"
+        )) {
             return ""
         }
-        if (lower.startsWith("within ") || lower.startsWith("download for")) {
+        if (lower.startsWith("within ") || lower.startsWith("download for") || lower.startsWith("rs ") || lower.startsWith("inr ")) {
             return ""
         }
         return cleaned
@@ -808,11 +825,13 @@ object SMSClassifier {
 
     private fun detectPaymentApp(sender: String, content: String): String {
         val combined = (sender + " " + content).lowercase(Locale.ENGLISH)
+        val hasCred = Regex("(?i)\\bcred\\s*(?:pay|app|club|cash)?\\b").containsMatchIn(combined) &&
+                !combined.contains("credit") && !combined.contains("credited")
         return when {
             combined.contains("gpay") || combined.contains("google pay") || combined.contains("@okhdfc") || combined.contains("@okaxis") || combined.contains("@oksbi") || combined.contains("@okicici") -> "Google Pay"
             combined.contains("phonepe") || combined.contains("@ybl") || combined.contains("@ibl") || combined.contains("@axl") -> "PhonePe"
             combined.contains("paytm") || combined.contains("@paytm") -> "Paytm"
-            combined.contains("cred") -> "CRED"
+            hasCred -> "CRED"
             combined.contains("bhim") -> "BHIM UPI"
             combined.contains("yes") || combined.contains("yesbnk") -> "YES Bank"
             combined.contains("indus") || combined.contains("indusb") -> "IndusInd Bank"
@@ -822,6 +841,7 @@ object SMSClassifier {
             combined.contains("icici") -> "ICICI Bank"
             combined.contains("axis") -> "Axis Bank"
             combined.contains("kotak") -> "Kotak Bank"
+            combined.contains("aubank") || combined.contains("au bank") || combined.contains("ad-aubank") -> "AU Small Finance Bank"
             combined.contains("union") -> "Union Bank"
             combined.contains("pnb") -> "PNB"
             else -> "Google Pay"
@@ -984,12 +1004,26 @@ object SMSClassifier {
         }
 
         if (direction == TransactionDirection.INCOMING) {
-            val incomeCat = availableCategories.find { it.type == "INCOME" || it.id == 7L }
-            return Triple(
-                incomeCat?.id ?: 7L,
-                incomeCat?.name ?: "Salary",
-                incomeCat?.colorHex ?: "#00E676"
-            )
+            val lowerContent = content.lowercase(Locale.ENGLISH)
+            val isExplicitSalary = lowerContent.contains("salary") || lowerContent.contains("payroll") ||
+                    lowerContent.contains("stipend") || lowerContent.contains("bonus")
+
+            return if (isExplicitSalary) {
+                val salaryCat = availableCategories.find { it.name.contains("Salary", ignoreCase = true) || it.id == 7L }
+                Triple(
+                    salaryCat?.id ?: 7L,
+                    salaryCat?.name ?: "Salary",
+                    salaryCat?.colorHex ?: "#00E676"
+                )
+            } else {
+                val incomeCat = availableCategories.find { it.name.equals("Income", ignoreCase = true) || (it.type == "INCOME" && !it.name.contains("Salary", ignoreCase = true)) }
+                    ?: availableCategories.find { it.type == "INCOME" }
+                Triple(
+                    incomeCat?.id ?: 7L,
+                    "Income",
+                    incomeCat?.colorHex ?: "#00E676"
+                )
+            }
         }
 
         val text = (counterparty + " " + content).lowercase(Locale.ENGLISH)

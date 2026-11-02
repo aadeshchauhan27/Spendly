@@ -58,6 +58,8 @@ fun SpendlyNavGraph(
     userPreferences: UserPreferences,
     repository: SpendlyRepository,
     currentTheme: ThemeMode,
+    authManager: com.spendly.app.core.auth.SpendlyAuthManager,
+    cloudSyncManager: com.spendly.app.data.sync.SpendlyCloudSyncManager,
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -133,8 +135,12 @@ fun SpendlyNavGraph(
             composable(Screen.Onboarding.route) {
                 OnboardingScreen(
                     onFinish = {
-                        navController.navigate(Screen.Permissions.route) {
-                            popUpTo(Screen.Onboarding.route) { inclusive = true }
+                        if (onboardingCompleted) {
+                            navController.popBackStack()
+                        } else {
+                            navController.navigate(Screen.Permissions.route) {
+                                popUpTo(Screen.Onboarding.route) { inclusive = true }
+                            }
                         }
                     }
                 )
@@ -200,6 +206,17 @@ fun SpendlyNavGraph(
                             sharedTransactionsViewModel.filterByDay(point.timestampMs)
                         }
                         navController.navigate(Screen.Transactions.route)
+                    },
+                    onTotalSpendingClick = {
+                        sharedTransactionsViewModel.filterByDirection(com.spendly.app.domain.model.TransactionDirection.OUTGOING)
+                        navController.navigate(Screen.Transactions.route)
+                    },
+                    onIncomeReceivedClick = {
+                        sharedTransactionsViewModel.filterByDirection(com.spendly.app.domain.model.TransactionDirection.INCOMING)
+                        navController.navigate(Screen.Transactions.route)
+                    },
+                    onNetCashFlowClick = {
+                        navController.navigate(Screen.Analytics.route)
                     }
                 )
             }
@@ -308,12 +325,18 @@ fun SpendlyNavGraph(
                 SettingsScreen(
                     currentTheme = currentTheme,
                     repository = repository,
+                    userPreferences = userPreferences,
+                    authManager = authManager,
+                    cloudSyncManager = cloudSyncManager,
                     importViewModel = importViewModel,
                     smsSyncViewModel = smsSyncViewModel,
                     onThemeChanged = { newTheme ->
                         coroutineScope.launch {
                             userPreferences.setThemeMode(newTheme)
                         }
+                    },
+                    onAppTourClick = {
+                        navController.navigate(Screen.Onboarding.route)
                     }
                 )
             }

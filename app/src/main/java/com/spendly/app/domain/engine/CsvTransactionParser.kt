@@ -459,12 +459,26 @@ object CsvTransactionParser {
     ): Triple<Long, String, String> {
         // If direction is incoming and contains salary/income words
         if (direction == TransactionDirection.INCOMING) {
-            val incomeCat = availableCategories.find { it.type == "INCOME" || it.id == 7L }
-            return Triple(
-                incomeCat?.id ?: 7L,
-                incomeCat?.name ?: "Salary",
-                incomeCat?.colorHex ?: "#00E676"
-            )
+            val lowerDesc = description.lowercase(Locale.ENGLISH)
+            val isExplicitSalary = lowerDesc.contains("salary") || lowerDesc.contains("payroll") ||
+                    lowerDesc.contains("stipend") || lowerDesc.contains("bonus")
+
+            return if (isExplicitSalary) {
+                val salaryCat = availableCategories.find { it.name.contains("Salary", ignoreCase = true) || it.id == 7L }
+                Triple(
+                    salaryCat?.id ?: 7L,
+                    salaryCat?.name ?: "Salary",
+                    salaryCat?.colorHex ?: "#00E676"
+                )
+            } else {
+                val incomeCat = availableCategories.find { it.name.equals("Income", ignoreCase = true) || (it.type == "INCOME" && !it.name.contains("Salary", ignoreCase = true)) }
+                    ?: availableCategories.find { it.type == "INCOME" }
+                Triple(
+                    incomeCat?.id ?: 7L,
+                    "Income",
+                    incomeCat?.colorHex ?: "#00E676"
+                )
+            }
         }
 
         // If explicit category is provided, match with available

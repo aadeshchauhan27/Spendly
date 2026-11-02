@@ -43,6 +43,7 @@ sealed interface TransactionsUiState {
         val availableCategories: List<Category>,
         val groupedTransactions: List<TransactionGroup>,
         val dateRange: TransactionDateRange? = null,
+        val selectedDirection: TransactionDirection? = null,
         val isEmpty: Boolean
     ) : TransactionsUiState
     data class Error(val message: String) : TransactionsUiState
@@ -52,47 +53,65 @@ class TransactionsViewModel(
     private val repository: SpendlyRepository
 ) : ViewModel() {
 
+    private data class FilterParams(
+        val query: String,
+        val category: String,
+        val dateRange: TransactionDateRange?,
+        val direction: TransactionDirection?
+    )
+
     private val searchQueryFlow = MutableStateFlow("")
     private val selectedCategoryFlow = MutableStateFlow("All")
     private val dateRangeFlow = MutableStateFlow<TransactionDateRange?>(null)
+    private val selectedDirectionFlow = MutableStateFlow<TransactionDirection?>(null)
+
+    private val filtersFlow = combine(
+        searchQueryFlow,
+        selectedCategoryFlow,
+        dateRangeFlow,
+        selectedDirectionFlow
+    ) { query, category, dateRange, direction ->
+        FilterParams(query, category, dateRange, direction)
+    }
 
     val uiState: StateFlow<TransactionsUiState> = combine(
         repository.getAllTransactionsFlow(),
         repository.getAllCategoriesFlow(),
-        searchQueryFlow,
-        selectedCategoryFlow,
-        dateRangeFlow
-    ) { allTransactions, categories, query, categoryFilter, dateRange ->
+        filtersFlow
+    ) { allTransactions, categories, filters ->
         val filtered = allTransactions.filter { tx ->
-            val matchesQuery = query.isBlank() ||
-                    tx.title.contains(query, ignoreCase = true) ||
-                    tx.counterpartyName.contains(query, ignoreCase = true) ||
-                    (tx.notes?.contains(query, ignoreCase = true) == true) ||
-                    (tx.bankReferenceNum?.contains(query, ignoreCase = true) == true)
+            val matchesQuery = filters.query.isBlank() ||
+                    tx.title.contains(filters.query, ignoreCase = true) ||
+                    tx.counterpartyName.contains(filters.query, ignoreCase = true) ||
+                    (tx.notes?.contains(filters.query, ignoreCase = true) == true) ||
+                    (tx.bankReferenceNum?.contains(filters.query, ignoreCase = true) == true)
 
-            val matchesCategory = if (categoryFilter == "All") {
+            val matchesCategory = if (filters.category == "All") {
                 tx.type != TransactionType.SPAM
             } else {
-                tx.categoryName.equals(categoryFilter, ignoreCase = true)
+                tx.categoryName.equals(filters.category, ignoreCase = true)
             }
 
-            val matchesDate = if (dateRange != null) {
-                tx.timestampMs in dateRange.startMs..dateRange.endMs
+            val matchesDate = if (filters.dateRange != null) {
+                tx.timestampMs in filters.dateRange.startMs..filters.dateRange.endMs
             } else {
                 true
             }
 
-            matchesQuery && matchesCategory && matchesDate
+            val matchesDirection = filters.direction == null || tx.direction == filters.direction
+
+            matchesQuery && matchesCategory && matchesDate && matchesDirection
         }
 
         val grouped = groupTransactionsByDay(filtered)
 
         TransactionsUiState.Success(
-            searchQuery = query,
-            selectedCategory = categoryFilter,
+            searchQuery = filters.query,
+            selectedCategory = filters.category,
             availableCategories = categories,
             groupedTransactions = grouped,
-            dateRange = dateRange,
+            dateRange = filters.dateRange,
+            selectedDirection = filters.direction,
             isEmpty = allTransactions.isEmpty()
         )
     }.stateIn(
@@ -100,6 +119,14 @@ class TransactionsViewModel(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = TransactionsUiState.Loading
     )
+
+    fun filterByDirection(direction: TransactionDirection?) {
+        selectedDirectionFlow.value = direction
+    }
+
+    fun clearDirectionFilter() {
+        selectedDirectionFlow.value = null
+    }
 
     fun onSearchQueryChange(query: String) {
         searchQueryFlow.value = query

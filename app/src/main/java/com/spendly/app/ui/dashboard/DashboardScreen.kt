@@ -4,7 +4,10 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.Surface
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -74,12 +77,15 @@ fun DashboardScreen(
     onTransactionClick: (Long) -> Unit,
     onProfileClick: () -> Unit,
     onTrendPointClick: (TrendPoint) -> Unit = {},
+    onTotalSpendingClick: () -> Unit = {},
+    onIncomeReceivedClick: () -> Unit = {},
+    onNetCashFlowClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val colors = SpendlyTheme.colors
     val haptic = LocalHapticFeedback.current
     val uiState by viewModel.uiState.collectAsState()
-    val periods = listOf("7D", "30D", "90D", "365D")
+    val periods = listOf("7D", "30D", "This Month", "90D", "365D")
     val context = LocalContext.current
     var visibleRecentCount by remember { mutableStateOf(10) }
     val listState = rememberLazyListState()
@@ -226,7 +232,14 @@ fun DashboardScreen(
                     ) {
                         // Hero Total Spending Card
                         item {
-                            SpendlyCard(modifier = Modifier.fillMaxWidth()) {
+                            SpendlyCard(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onTotalSpendingClick()
+                                    }
+                            ) {
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -237,11 +250,22 @@ fun DashboardScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            text = "Total Spending",
-                                            style = SpendlyTheme.typography.bodyMedium,
-                                            color = colors.textSecondary
-                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text(
+                                                text = "Total Spending",
+                                                style = SpendlyTheme.typography.bodyMedium,
+                                                color = colors.textSecondary
+                                            )
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                                contentDescription = "View Expenses",
+                                                tint = colors.textMuted,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
 
                                         // Trend change badge
                                         if (state.summary.spendingChangePercent != null) {
@@ -292,14 +316,23 @@ fun DashboardScreen(
 
                                     Spacer(modifier = Modifier.height(16.dp))
 
-                                    // Sub-metrics: Income, Received, Net Cash Flow
+                                    // Sub-metrics: Income, Received, Net Cash Flow (All clickable)
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Column(modifier = Modifier.weight(1f)) {
+                                        Column(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .clickable {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    onIncomeReceivedClick()
+                                                }
+                                                .padding(vertical = 4.dp, horizontal = 2.dp)
+                                        ) {
                                             Text(
-                                                text = "Income",
+                                                text = "Income ↗",
                                                 style = SpendlyTheme.typography.labelSmall,
                                                 color = colors.textMuted
                                             )
@@ -311,9 +344,19 @@ fun DashboardScreen(
                                             )
                                         }
 
-                                        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Column(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .clickable {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    onIncomeReceivedClick()
+                                                }
+                                                .padding(vertical = 4.dp, horizontal = 2.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
                                             Text(
-                                                text = "Received",
+                                                text = "Received ↗",
                                                 style = SpendlyTheme.typography.labelSmall,
                                                 color = colors.textMuted
                                             )
@@ -325,9 +368,19 @@ fun DashboardScreen(
                                             )
                                         }
 
-                                        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                                        Column(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .clickable {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    onNetCashFlowClick()
+                                                }
+                                                .padding(vertical = 4.dp, horizontal = 2.dp),
+                                            horizontalAlignment = Alignment.End
+                                        ) {
                                             Text(
-                                                text = "Net Cash Flow",
+                                                text = "Net Cash Flow ↗",
                                                 style = SpendlyTheme.typography.labelSmall,
                                                 color = colors.textMuted
                                             )
@@ -344,10 +397,12 @@ fun DashboardScreen(
                             }
                         }
 
-                        // Period Filter Chips
+                        // Period Filter Chips (Scrollable for 7D, 30D, This Month, 90D, 365D)
                         item {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 periods.forEach { period ->

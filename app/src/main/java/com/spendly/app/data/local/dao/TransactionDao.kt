@@ -67,6 +67,29 @@ interface TransactionDao {
     suspend fun cleanupMiscalibratedIdfcLimit(): Int
 
     @Query("""
+        DELETE FROM transactions 
+        WHERE id = 3481 
+           OR amount_paise = 536664 
+           OR tag LIKE '%upcoming mandate%' 
+           OR tag LIKE '%pause mandate%' 
+           OR tag LIKE '%merchantmandate%'
+           OR notes LIKE '%upcoming mandate%'
+           OR notes LIKE '%pause mandate%'
+           OR notes LIKE '%merchantmandate%'
+    """)
+    suspend fun cleanupUpcomingMandates(): Int
+
+    @Query("""
+        UPDATE transactions
+        SET title = 'Money Received', counterparty_name = 'Money Received'
+        WHERE (title = 'CRED' OR counterparty_name = 'CRED')
+          AND direction = 'INCOMING'
+          AND (tag IS NULL OR tag NOT LIKE '%cred cash%')
+          AND (notes IS NULL OR notes NOT LIKE '%cred cash%')
+    """)
+    suspend fun cleanupMisclassifiedCred(): Int
+
+    @Query("""
         UPDATE transactions 
         SET status = 'FAILED' 
         WHERE status != 'FAILED'

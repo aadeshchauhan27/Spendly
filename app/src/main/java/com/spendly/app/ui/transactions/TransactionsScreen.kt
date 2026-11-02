@@ -58,6 +58,8 @@ import com.spendly.app.core.components.SpendlyTransactionRow
 import com.spendly.app.core.components.getCategoryIconAndColor
 import com.spendly.app.core.theme.DarkNavyBackground
 import com.spendly.app.core.theme.ElectricLime
+import com.spendly.app.core.theme.StatusExpenseRed
+import com.spendly.app.core.theme.StatusIncomeGreen
 import com.spendly.app.core.theme.PillShape
 import com.spendly.app.core.theme.SpendlyTheme
 import com.spendly.app.ui.import_export.ImportPreviewBottomSheet
@@ -371,6 +373,48 @@ fun TransactionsScreen(
                                             .clickable {
                                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                                 viewModel.clearDateRange()
+                                            }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (state.selectedDirection != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val dirLabel = if (state.selectedDirection == com.spendly.app.domain.model.TransactionDirection.OUTGOING) "Expenses Only" else "Income / Received Only"
+                            val dirColor = if (state.selectedDirection == com.spendly.app.domain.model.TransactionDirection.OUTGOING) StatusExpenseRed else StatusIncomeGreen
+                            Box(
+                                modifier = Modifier
+                                    .clip(PillShape)
+                                    .background(dirColor.copy(alpha = 0.15f))
+                                    .border(1.dp, dirColor.copy(alpha = 0.4f), PillShape)
+                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = dirLabel,
+                                        style = SpendlyTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = dirColor
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Clear direction filter",
+                                        tint = dirColor,
+                                        modifier = Modifier
+                                            .size(14.dp)
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                viewModel.clearDirectionFilter()
                                             }
                                     )
                                 }

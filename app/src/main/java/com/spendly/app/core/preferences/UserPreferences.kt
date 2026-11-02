@@ -20,6 +20,11 @@ class UserPreferences(private val context: Context) {
         private val KEY_USER_NAME = stringPreferencesKey("user_name")
         private val KEY_USER_EMAIL = stringPreferencesKey("user_email")
         private val KEY_DEMO_DATA_SEEDED = booleanPreferencesKey("demo_data_seeded")
+        private val KEY_GOOGLE_ACCOUNT_EMAIL = stringPreferencesKey("google_account_email")
+        private val KEY_GOOGLE_ACCOUNT_NAME = stringPreferencesKey("google_account_name")
+        private val KEY_GOOGLE_PHOTO_URL = stringPreferencesKey("google_photo_url")
+        private val KEY_CLOUD_SYNC_ENABLED = booleanPreferencesKey("cloud_sync_enabled")
+        private val KEY_LAST_CLOUD_SYNC_TIME = androidx.datastore.preferences.core.longPreferencesKey("last_cloud_sync_time")
     }
 
     val themeModeFlow: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
@@ -79,5 +84,72 @@ class UserPreferences(private val context: Context) {
 
     val isDemoDataSeededFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[KEY_DEMO_DATA_SEEDED] ?: false
+    }
+
+    val googleAccountEmailFlow: Flow<String?> = context.dataStore.data.map { prefs ->
+        prefs[KEY_GOOGLE_ACCOUNT_EMAIL]
+    }
+
+    val googleAccountNameFlow: Flow<String?> = context.dataStore.data.map { prefs ->
+        prefs[KEY_GOOGLE_ACCOUNT_NAME]
+    }
+
+    val googlePhotoUrlFlow: Flow<String?> = context.dataStore.data.map { prefs ->
+        prefs[KEY_GOOGLE_PHOTO_URL]
+    }
+
+    val isGoogleSignedInFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        !prefs[KEY_GOOGLE_ACCOUNT_EMAIL].isNullOrBlank()
+    }
+
+    val isCloudSyncEnabledFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[KEY_CLOUD_SYNC_ENABLED] ?: false
+    }
+
+    val lastCloudSyncTimeFlow: Flow<Long> = context.dataStore.data.map { prefs ->
+        prefs[KEY_LAST_CLOUD_SYNC_TIME] ?: 0L
+    }
+
+    suspend fun setGoogleAccount(email: String?, name: String?, photoUrl: String?) {
+        context.dataStore.edit { prefs ->
+            if (email != null) {
+                prefs[KEY_GOOGLE_ACCOUNT_EMAIL] = email
+                prefs[KEY_USER_EMAIL] = email
+            } else {
+                prefs.remove(KEY_GOOGLE_ACCOUNT_EMAIL)
+            }
+            if (name != null) {
+                prefs[KEY_GOOGLE_ACCOUNT_NAME] = name
+                prefs[KEY_USER_NAME] = name
+            } else {
+                prefs.remove(KEY_GOOGLE_ACCOUNT_NAME)
+            }
+            if (photoUrl != null) {
+                prefs[KEY_GOOGLE_PHOTO_URL] = photoUrl
+            } else {
+                prefs.remove(KEY_GOOGLE_PHOTO_URL)
+            }
+        }
+    }
+
+    suspend fun signOutGoogle() {
+        context.dataStore.edit { prefs ->
+            prefs.remove(KEY_GOOGLE_ACCOUNT_EMAIL)
+            prefs.remove(KEY_GOOGLE_ACCOUNT_NAME)
+            prefs.remove(KEY_GOOGLE_PHOTO_URL)
+            prefs[KEY_CLOUD_SYNC_ENABLED] = false
+        }
+    }
+
+    suspend fun setCloudSyncEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_CLOUD_SYNC_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setLastCloudSyncTime(timeMs: Long) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_LAST_CLOUD_SYNC_TIME] = timeMs
+        }
     }
 }
