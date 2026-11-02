@@ -221,4 +221,132 @@ class TransactionDeduplicatorTest {
         // Verify shouldPreferCandidate prefers "HDFC Bank" over generic "Upi Payment"
         assertTrue(TransactionDeduplicator.shouldPreferCandidate(nachDebit, achDebit))
     }
+
+    @Test
+    fun findDuplicate_preservesSeparateIncomingCreditsWithDifferentUtrAndVpa() {
+        val cal = java.util.Calendar.getInstance()
+        cal.set(2026, java.util.Calendar.NOVEMBER, 1, 11, 13, 19)
+        val morningTime = cal.timeInMillis
+
+        cal.set(2026, java.util.Calendar.NOVEMBER, 1, 14, 28, 33)
+        val afternoonTime = cal.timeInMillis
+
+        val txMorning = Transaction(
+            id = 7,
+            amountPaise = 206000L,
+            type = TransactionType.INCOME,
+            direction = TransactionDirection.INCOMING,
+            status = TransactionStatus.COMPLETED,
+            title = "garg@ybl",
+            counterpartyName = "garg@ybl",
+            counterpartyUpiId = "garg@ybl",
+            categoryId = 7,
+            timestampMs = morningTime,
+            bankReferenceNum = "301975700816",
+            notes = "A/c ending **7862",
+            tag = "Credit Alert! Rs.2060.00 credited to HDFC Bank A/c XX7862 on 01-11-26 from VPA *garg@ybl (UPI 301975700816)"
+        )
+
+        val txAfternoon = Transaction(
+            id = 4,
+            amountPaise = 206000L,
+            type = TransactionType.INCOME,
+            direction = TransactionDirection.INCOMING,
+            status = TransactionStatus.COMPLETED,
+            title = "6912@ybl",
+            counterpartyName = "6912@ybl",
+            counterpartyUpiId = "6912@ybl",
+            categoryId = 7,
+            timestampMs = afternoonTime,
+            bankReferenceNum = "393096780809",
+            notes = "A/c ending **7862",
+            tag = "Credit Alert! Rs.2060.00 credited to HDFC Bank A/c XX7862 on 01-11-26 from VPA *6912@ybl (UPI 393096780809)"
+        )
+
+        // Must NOT be detected as duplicates despite identical amount and account!
+        assertNull(
+            "Distinct incoming credits with different UTRs and VPAs must never be merged",
+            TransactionDeduplicator.findDuplicate(txAfternoon, listOf(txMorning))
+        )
+        assertNull(
+            "Distinct incoming credits with different UTRs and VPAs must never be merged (reverse)",
+            TransactionDeduplicator.findDuplicate(txMorning, listOf(txAfternoon))
+        )
+    }
+
+    @Test
+    fun findDuplicate_rejectsDifferentUtrsEvenIfSameMerchantAndAccount() {
+        val now = System.currentTimeMillis()
+        val tx1 = Transaction(
+            id = 101,
+            amountPaise = 50000L,
+            type = TransactionType.EXPENSE,
+            direction = TransactionDirection.OUTGOING,
+            status = TransactionStatus.COMPLETED,
+            title = "Swiggy",
+            counterpartyName = "Swiggy",
+            categoryId = 1,
+            timestampMs = now,
+            bankReferenceNum = "111122223333",
+            notes = "A/c ending **1234"
+        )
+        val tx2 = tx1.copy(
+            id = 102,
+            bankReferenceNum = "999988887777", // Different UTR
+            timestampMs = now + 60_000L
+        )
+
+        assertNull(
+            "Different UTRs must definitively mean two distinct transactions",
+            TransactionDeduplicator.findDuplicate(tx2, listOf(tx1))
+        )
+    }
+
+    @Test
+    fun findDuplicate_matchesIdenticalSmsTagOnSameDayAndPrefersRealUtr() {
+        val cal = java.util.Calendar.getInstance()
+        cal.set(2026, java.util.Calendar.OCTOBER, 28, 1, 34, 27)
+        val ts = cal.timeInMillis
+
+        val smsText = "INR 318815.00 credited to Axis Bank A/c XX3721 on 28-10-26 at 01:32:37 IST. Ref: NEFT/CHASH00063843585/FQ I.View bal: https://ccm.axis.bank.in/AXISBK/m49XJ3KM"
+
+        // Existing transaction inserted without UTR
+        val existing = Transaction(
+            id = 23,
+            amountPaise = 31881500L,
+            type = TransactionType.INCOME,
+            direction = TransactionDirection.INCOMING,
+            status = TransactionStatus.COMPLETED,
+            title = "Money Received",
+            counterpartyName = "Money Received",
+            categoryId = 7,
+            timestampMs = ts,
+            bankReferenceNum = null,
+            notes = "A/c ending **3721",
+            tag = smsText
+        )
+
+        // Candidate re-parsed with extracted NEFT UTR
+        val candidate = Transaction(
+            id = 2830,
+            amountPaise = 31881500L,
+            type = TransactionType.INCOME,
+            direction = TransactionDirection.INCOMING,
+            status = TransactionStatus.COMPLETED,
+            title = "FQ I",
+            counterpartyName = "FQ I",
+            categoryId = 7,
+            timestampMs = ts,
+            bankReferenceNum = "CHASH00063843585",
+            notes = "A/c ending **3721",
+            tag = smsText
+        )
+
+        val duplicate = TransactionDeduplicator.findDuplicate(candidate, listOf(existing))
+        assertNotNull("Identical SMS on same day must be detected as duplicate", duplicate)
+        assertEquals(23L, duplicate?.id)
+
+        // Must prefer candidate with real UTR and specific merchant over old generic row
+        assertTrue(TransactionDeduplicator.shouldPreferCandidate(candidate, existing))
+    }
 }

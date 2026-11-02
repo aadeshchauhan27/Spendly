@@ -95,7 +95,7 @@ fun DashboardScreen(
         Manifest.permission.READ_SMS
     ) == PackageManager.PERMISSION_GRANTED
 
-    LaunchedEffect(hasSmsPermission) {
+    LaunchedEffect(Unit, hasSmsPermission) {
         if (hasSmsPermission) {
             viewModel.syncTransactionsFromSms(context)
         }

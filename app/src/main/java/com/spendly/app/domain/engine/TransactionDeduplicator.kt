@@ -2,6 +2,7 @@ package com.spendly.app.domain.engine
 
 import com.spendly.app.data.local.entity.DeletedTransactionEntity
 import com.spendly.app.domain.model.Transaction
+import com.spendly.app.domain.model.TransactionDirection
 import com.spendly.app.domain.model.TransactionStatus
 import java.util.Calendar
 import java.util.Locale
@@ -9,7 +10,8 @@ import java.util.Locale
 object TransactionDeduplicator {
 
     private const val FUZZY_TIME_WINDOW_MS = 30 * 60 * 1000L // 30 minutes window for general same-merchant
-    private const val SAME_ACCOUNT_WINDOW_MS = 4 * 60 * 60 * 1000L // 4 hours window for same account
+    private const val INCOMING_STRICT_WINDOW_MS = 15 * 60 * 1000L // 15 minutes window for incoming credit retry
+    private const val SAME_ACCOUNT_WINDOW_MS = 4 * 60 * 60 * 1000L // 4 hours window for same account mandate/batch
 
     private val GENERIC_MERCHANT_NAMES = setOf(
         "upi payment", "money sent", "money received", "bank transfer",
@@ -30,6 +32,18 @@ object TransactionDeduplicator {
                 lower.contains("si set") || lower.contains("umrn") || lower.contains("emidr")
     }
 
+    fun sanitizeUtr(ref: String?): String? {
+        if (ref.isNullOrBlank()) return null
+        val trimmed = ref.trim()
+        if ((trimmed.startsWith("91") && trimmed.length == 12 && trimmed.all { it.isDigit() }) ||
+            (trimmed.length == 10 && trimmed.all { it.isDigit() }) ||
+            trimmed.length < 6
+        ) {
+            return null
+        }
+        return trimmed
+    }
+
     fun isSameCalendarDay(t1: Long, t2: Long): Boolean {
         val c1 = Calendar.getInstance().apply { timeInMillis = t1 }
         val c2 = Calendar.getInstance().apply { timeInMillis = t2 }
@@ -46,87 +60,138 @@ object TransactionDeduplicator {
 
     /**
      * Checks if two transactions are duplicates based on multi-tiered validation rules:
-     * 1. Exact Bank Reference (UTR)
-     * 2. Exact Raw Import Identifier
-     * 3. Same Amount + Direction + Same Calendar Day:
-     *    - Both are NACH/ACH/Mandate/AutoPay (same account or within 12 hours)
-     *    - Same Bank Account + same merchant or one is generic (within 4 hours or mandate)
-     *    - Same Bank Account rapid duplicate (within 30 mins)
-     *    - Same Normalized Merchant (within 30 mins)
-     *    - Midnight timestamp reconciliation
+     * 1. Exact Bank Reference (UTR) Match vs Conflict
+     * 2. Counterparty UPI VPA Conflict Guard
+     * 3. Exact Raw Import Identifier
+     * 4. Same Amount + Direction + Same Calendar Day
+     *    - INCOMING Credits: strictly requires same UTR or same VPA/sender within 15 mins.
+     *      Never merges distinct incoming credits across hours or generic senders!
+     *    - OUTGOING Debits:
+     *      - NACH/ACH/Mandate/AutoPay deduplication on same day (12h)
+     *      - Same Bank Account + specific merchant or mandate (within 4h)
+     *      - Same Bank Account rapid duplicate (within 30 mins)
+     *      - Same Normalized Merchant (within 30 mins)
+     *      - Midnight statement timestamp reconciliation
      */
     fun isDuplicatePair(candidate: Transaction, existing: Transaction): Boolean {
-        // 1. Exact match on bank reference number (UTR / Txn ID) if present and non-blank in both
-        if (!candidate.bankReferenceNum.isNullOrBlank() && !existing.bankReferenceNum.isNullOrBlank()) {
-            if (candidate.bankReferenceNum.equals(existing.bankReferenceNum, ignoreCase = true)) {
+        // 0. Must match amount in paise and direction
+        if (existing.amountPaise != candidate.amountPaise || existing.direction != candidate.direction) {
+            return false
+        }
+
+        // 1. Bank Reference Number (UTR) Check
+        val cUtr = sanitizeUtr(candidate.bankReferenceNum)
+        val eUtr = sanitizeUtr(existing.bankReferenceNum)
+        if (cUtr != null && eUtr != null) {
+            if (cUtr.equals(eUtr, ignoreCase = true)) {
                 return true
+            } else {
+                // Both have non-blank, distinct valid UTRs -> definitively two different financial transactions!
+                return false
             }
         }
 
-        // 2. Exact match on raw import identifier if present
+        // 2. UPI VPA Conflict Guard
+        val cUpi = candidate.counterpartyUpiId?.trim()?.lowercase(Locale.ENGLISH)
+        val eUpi = existing.counterpartyUpiId?.trim()?.lowercase(Locale.ENGLISH)
+        if (!cUpi.isNullOrBlank() && !eUpi.isNullOrBlank()) {
+            if (!cUpi.equals(eUpi, ignoreCase = true)) {
+                // Different UPI IDs -> received from / sent to different counterparties!
+                return false
+            }
+        }
+
+        // 3. Exact match on raw import identifier if present
         if (!candidate.rawIdentifier.isNullOrBlank() && !existing.rawIdentifier.isNullOrBlank()) {
             if (candidate.rawIdentifier.equals(existing.rawIdentifier, ignoreCase = true)) {
                 return true
             }
         }
 
-        // 3. Must match amount in paise and direction
-        if (existing.amountPaise != candidate.amountPaise || existing.direction != candidate.direction) {
-            return false
-        }
-
-        // 4. Must be on the same calendar day
+        // 4. Calendar day check
         val sameDay = isSameCalendarDay(existing.timestampMs, candidate.timestampMs)
         if (!sameDay) return false
 
+        // 4b. Exact match on raw SMS tag/body on the same calendar day
+        if (!candidate.tag.isNullOrBlank() && !existing.tag.isNullOrBlank()) {
+            if (candidate.tag.trim().equals(existing.tag.trim(), ignoreCase = true)) {
+                return true
+            }
+        }
+
         val timeDiff = Math.abs(existing.timestampMs - candidate.timestampMs)
 
-        // Tier A: NACH / ACH / Mandate deduplication on the same day
+        // 4c. Exact timestamp match to the second (exact carrier SMS timestamp match)
+        if (timeDiff <= 1000L) {
+            return true
+        }
+
+        // 5. INCOMING Credit Rules:
+        // A user frequently receives identical amounts from different people or at different times of day.
+        // Never deduplicate incoming payments across hours or when sender is generic ("Money Received").
+        if (candidate.direction == TransactionDirection.INCOMING) {
+            val sameUpi = !cUpi.isNullOrBlank() && cUpi.equals(eUpi, ignoreCase = true)
+            val candidateMerchant = MerchantNormalizer.normalize(candidate.counterpartyName)
+            val existingMerchant = MerchantNormalizer.normalize(existing.counterpartyName)
+            val sameSpecificMerchant = !isGenericMerchant(candidateMerchant) &&
+                    candidateMerchant.equals(existingMerchant, ignoreCase = true)
+
+            // Only deduplicate if verified to be the same sender within 15 minutes (carrier SMS re-delivery)
+            if ((sameUpi || sameSpecificMerchant) && timeDiff <= INCOMING_STRICT_WINDOW_MS) {
+                return true
+            }
+            return false
+        }
+
+        // 6. OUTGOING Debit Rules:
         val candidateMandate = hasMandateKeywords(candidate.tag) || hasMandateKeywords(candidate.notes) || hasMandateKeywords(candidate.title)
         val existingMandate = hasMandateKeywords(existing.tag) || hasMandateKeywords(existing.notes) || hasMandateKeywords(existing.title)
         val sameAccount = !candidate.notes.isNullOrBlank() && candidate.notes == existing.notes
 
+        // Tier A: NACH / ACH / Mandate deduplication on the same day
         if (candidateMandate && existingMandate) {
             if (sameAccount || timeDiff <= 12 * 60 * 60 * 1000L) {
                 return true
             }
         }
 
+        val candidateMerchant = MerchantNormalizer.normalize(candidate.counterpartyName)
+        val existingMerchant = MerchantNormalizer.normalize(existing.counterpartyName)
+
         // Tier B: Same Bank Account on the same day
         if (sameAccount) {
-            val candidateMerchant = MerchantNormalizer.normalize(candidate.counterpartyName)
-            val existingMerchant = MerchantNormalizer.normalize(existing.counterpartyName)
+            // Mandate alert + settlement confirmation on the same account
+            if (candidateMandate || existingMandate) {
+                if (candidateMerchant.equals(existingMerchant, ignoreCase = true) ||
+                    isGenericMerchant(candidateMerchant) || isGenericMerchant(existingMerchant)
+                ) {
+                    if (timeDiff <= SAME_ACCOUNT_WINDOW_MS) {
+                        return true
+                    }
+                }
+            }
 
-            // Matching merchant on same account within 4 hours (or if either is a recurring mandate)
-            if (candidateMerchant.equals(existingMerchant, ignoreCase = true)) {
-                if (timeDiff <= SAME_ACCOUNT_WINDOW_MS || candidateMandate || existingMandate) {
+            // Matching specific merchant on same account within 4 hours
+            if (!isGenericMerchant(candidateMerchant) && candidateMerchant.equals(existingMerchant, ignoreCase = true)) {
+                if (timeDiff <= SAME_ACCOUNT_WINDOW_MS) {
                     return true
                 }
             }
 
-            // One generic merchant ("UPI Payment", "Money Sent") and one specific ("HDFC Bank")
-            if (isGenericMerchant(candidateMerchant) || isGenericMerchant(existingMerchant)) {
-                if (timeDiff <= SAME_ACCOUNT_WINDOW_MS || candidateMandate || existingMandate) {
-                    return true
-                }
-            }
-
-            // Rapid duplicate on same account within 30 minutes
+            // Generic merchant on same account: ONLY if rapid duplicate within 30 minutes
             if (timeDiff <= FUZZY_TIME_WINDOW_MS) {
                 return true
             }
         }
 
-        // Tier C: Same merchant without account details within 30 minutes
-        val candidateMerchant = MerchantNormalizer.normalize(candidate.counterpartyName)
-        val existingMerchant = MerchantNormalizer.normalize(existing.counterpartyName)
+        // Tier C: Same specific merchant without account details within 30 minutes
         if (!isGenericMerchant(candidateMerchant) && candidateMerchant.equals(existingMerchant, ignoreCase = true)) {
             if (timeDiff <= FUZZY_TIME_WINDOW_MS) {
                 return true
             }
         }
 
-        // Tier D: Midnight reconciliation (e.g. statement timestamp 00:00:00 vs real SMS time)
+        // Tier D: Midnight reconciliation (statement timestamp 00:00:00 vs real SMS time)
         if (isMidnight(existing.timestampMs) || isMidnight(candidate.timestampMs)) {
             if (candidateMerchant.equals(existingMerchant, ignoreCase = true) ||
                 isGenericMerchant(candidateMerchant) || isGenericMerchant(existingMerchant)
@@ -146,15 +211,15 @@ object TransactionDeduplicator {
         candidate: Transaction,
         existingTransactions: List<Transaction>
     ): Transaction? {
-        // 1. Exact match on bank reference number (UTR / Txn ID) if present and non-blank
-        if (!candidate.bankReferenceNum.isNullOrBlank()) {
+        val cUtr = sanitizeUtr(candidate.bankReferenceNum)
+        if (cUtr != null) {
             val exactMatch = existingTransactions.find {
-                !it.bankReferenceNum.isNullOrBlank() && it.bankReferenceNum.equals(candidate.bankReferenceNum, ignoreCase = true)
+                val eUtr = sanitizeUtr(it.bankReferenceNum)
+                eUtr != null && eUtr.equals(cUtr, ignoreCase = true)
             }
             if (exactMatch != null) return exactMatch
         }
 
-        // 2. Exact match on raw import identifier if present
         if (!candidate.rawIdentifier.isNullOrBlank()) {
             val identifierMatch = existingTransactions.find {
                 !it.rawIdentifier.isNullOrBlank() && it.rawIdentifier.equals(candidate.rawIdentifier, ignoreCase = true)
@@ -162,7 +227,6 @@ object TransactionDeduplicator {
             if (identifierMatch != null) return identifierMatch
         }
 
-        // 3. Multi-tiered match on candidate
         return existingTransactions.find { existing ->
             isDuplicatePair(candidate, existing)
         }
@@ -280,8 +344,9 @@ object TransactionDeduplicator {
         }
 
         fun add(tx: Transaction) {
-            if (!tx.bankReferenceNum.isNullOrBlank()) {
-                refMap[tx.bankReferenceNum.trim().lowercase(Locale.ENGLISH)] = tx
+            val utr = sanitizeUtr(tx.bankReferenceNum)
+            if (utr != null) {
+                refMap[utr.lowercase(Locale.ENGLISH)] = tx
             }
             if (!tx.rawIdentifier.isNullOrBlank()) {
                 rawIdMap[tx.rawIdentifier.trim().lowercase(Locale.ENGLISH)] = tx
@@ -291,8 +356,9 @@ object TransactionDeduplicator {
 
         fun findDuplicate(candidate: Transaction): Transaction? {
             // 1. Bank reference match
-            if (!candidate.bankReferenceNum.isNullOrBlank()) {
-                val match = refMap[candidate.bankReferenceNum.trim().lowercase(Locale.ENGLISH)]
+            val cUtr = sanitizeUtr(candidate.bankReferenceNum)
+            if (cUtr != null) {
+                val match = refMap[cUtr.lowercase(Locale.ENGLISH)]
                 if (match != null) return match
             }
 

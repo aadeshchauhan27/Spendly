@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Flight
@@ -23,8 +24,10 @@ import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -120,15 +123,19 @@ val AVAILABLE_CATEGORY_ICONS = listOf(
     "food_dining" to Icons.Default.Restaurant,
     "groceries" to Icons.Default.ShoppingCart,
     "shopping" to Icons.Default.ShoppingBag,
-    "travel" to Icons.Default.Flight,
-    "transport" to Icons.Default.DirectionsCar,
     "fuel" to Icons.Default.LocalGasStation,
+    "transport" to Icons.Default.DirectionsCar,
+    "travel" to Icons.Default.Flight,
     "bills_utilities" to Icons.Default.ReceiptLong,
+    "loans" to Icons.Default.AccountBalance,
+    "househelp" to Icons.Default.CleaningServices,
     "healthcare" to Icons.Default.LocalHospital,
     "entertainment" to Icons.Default.SportsEsports,
     "home" to Icons.Default.Home,
     "education" to Icons.Default.School,
     "investment" to Icons.Default.Savings,
+    "insurance" to Icons.Default.Security,
+    "personal_care" to Icons.Default.Spa,
     "salary" to Icons.Default.AttachMoney,
     "transfer" to Icons.AutoMirrored.Filled.CompareArrows,
     "others" to Icons.Default.MoreHoriz,
@@ -141,15 +148,19 @@ val CATEGORY_ICON_ITEMS = listOf(
     CategoryIconItem("food_dining", "Food & Dining", R.drawable.ic_cat_food_dining, Icons.Default.Restaurant),
     CategoryIconItem("groceries", "Groceries", R.drawable.ic_cat_groceries, Icons.Default.ShoppingCart),
     CategoryIconItem("shopping", "Shopping", R.drawable.ic_cat_shopping, Icons.Default.ShoppingBag),
-    CategoryIconItem("travel", "Travel", R.drawable.ic_cat_travel, Icons.Default.Flight),
-    CategoryIconItem("transport", "Transport", R.drawable.ic_cat_transport, Icons.Default.DirectionsCar),
     CategoryIconItem("fuel", "Fuel", R.drawable.ic_cat_fuel, Icons.Default.LocalGasStation),
+    CategoryIconItem("transport", "Transport", R.drawable.ic_cat_transport, Icons.Default.DirectionsCar),
+    CategoryIconItem("travel", "Travel", R.drawable.ic_cat_travel, Icons.Default.Flight),
     CategoryIconItem("bills_utilities", "Bills & Utilities", R.drawable.ic_cat_bills_utilities, Icons.Default.ReceiptLong),
+    CategoryIconItem("loans", "Loans & EMI", R.drawable.ic_cat_loans, Icons.Default.AccountBalance),
+    CategoryIconItem("househelp", "Househelp", R.drawable.ic_cat_househelp, Icons.Default.CleaningServices),
     CategoryIconItem("healthcare", "Healthcare", R.drawable.ic_cat_healthcare, Icons.Default.LocalHospital),
     CategoryIconItem("entertainment", "Entertainment", R.drawable.ic_cat_entertainment, Icons.Default.SportsEsports),
     CategoryIconItem("home", "Home", R.drawable.ic_cat_home, Icons.Default.Home),
     CategoryIconItem("education", "Education", R.drawable.ic_cat_education, Icons.Default.School),
     CategoryIconItem("investment", "Investment", R.drawable.ic_cat_investment, Icons.Default.Savings),
+    CategoryIconItem("insurance", "Insurance", R.drawable.ic_cat_insurance, Icons.Default.Security),
+    CategoryIconItem("personal_care", "Personal Care", R.drawable.ic_cat_personal_care, Icons.Default.Spa),
     CategoryIconItem("salary", "Salary / Income", R.drawable.ic_cat_salary, Icons.Default.AttachMoney),
     CategoryIconItem("transfer", "Transfer", R.drawable.ic_cat_transfer, Icons.AutoMirrored.Filled.CompareArrows),
     CategoryIconItem("others", "Others", R.drawable.ic_cat_others, Icons.Default.MoreHoriz)
@@ -168,6 +179,10 @@ val AVAILABLE_CATEGORY_COLORS = listOf(
     "#2ECC71", // Emerald Green (Home)
     "#2B8CEE", // Cobalt Blue (Education)
     "#FFB703", // Sun Yellow (Investment)
+    "#4F46E5", // Indigo (Loans & EMI)
+    "#F43F5E", // Coral Rose (Househelp)
+    "#0D9488", // Teal (Insurance)
+    "#EC4899", // Fuchsia Pink (Personal Care)
     "#10B981", // Forest Mint (Salary)
     "#6366F1", // Indigo (Transfer)
     "#94A3B8", // Slate (Others)
@@ -181,15 +196,19 @@ fun getCategoryDrawable(iconName: String?, categoryName: String? = null): Int {
             trimmedIcon.contains("food") || trimmedIcon.contains("restaurant") || trimmedIcon.contains("dining") -> return R.drawable.ic_cat_food_dining
             trimmedIcon.contains("grocer") || trimmedIcon.contains("shopping_cart") || trimmedIcon.contains("cart") -> return R.drawable.ic_cat_groceries
             trimmedIcon.contains("shopping") || trimmedIcon.contains("bag") -> return R.drawable.ic_cat_shopping
-            trimmedIcon.contains("travel") || trimmedIcon.contains("flight") || trimmedIcon.contains("plane") -> return R.drawable.ic_cat_travel
-            trimmedIcon.contains("transport") || trimmedIcon.contains("car") || trimmedIcon.contains("directions_car") -> return R.drawable.ic_cat_transport
             trimmedIcon.contains("fuel") || trimmedIcon.contains("gas") || trimmedIcon.contains("petrol") -> return R.drawable.ic_cat_fuel
+            trimmedIcon.contains("transport") || trimmedIcon.contains("directions_car") -> return R.drawable.ic_cat_transport
+            trimmedIcon.contains("travel") || trimmedIcon.contains("flight") || trimmedIcon.contains("plane") -> return R.drawable.ic_cat_travel
             trimmedIcon.contains("bill") || trimmedIcon.contains("utilit") || trimmedIcon.contains("receipt") -> return R.drawable.ic_cat_bills_utilities
+            trimmedIcon.contains("loan") || trimmedIcon.contains("emi") || trimmedIcon.contains("debt") -> return R.drawable.ic_cat_loans
+            trimmedIcon.contains("househelp") || trimmedIcon.contains("maid") || trimmedIcon.contains("clean") || trimmedIcon.contains("domestic") -> return R.drawable.ic_cat_househelp
             trimmedIcon.contains("health") || trimmedIcon.contains("hospital") || trimmedIcon.contains("medic") -> return R.drawable.ic_cat_healthcare
             trimmedIcon.contains("entertain") || trimmedIcon.contains("movie") || trimmedIcon.contains("game") || trimmedIcon.contains("esports") -> return R.drawable.ic_cat_entertainment
-            trimmedIcon.contains("home") || trimmedIcon.contains("house") -> return R.drawable.ic_cat_home
+            trimmedIcon.contains("home") || trimmedIcon.contains("house") || trimmedIcon.contains("rent") -> return R.drawable.ic_cat_home
             trimmedIcon.contains("educat") || trimmedIcon.contains("school") -> return R.drawable.ic_cat_education
             trimmedIcon.contains("invest") || trimmedIcon.contains("savings") -> return R.drawable.ic_cat_investment
+            trimmedIcon.contains("insuran") || trimmedIcon.contains("policy") || trimmedIcon.contains("security") -> return R.drawable.ic_cat_insurance
+            trimmedIcon.contains("personal") || trimmedIcon.contains("salon") || trimmedIcon.contains("spa") || trimmedIcon.contains("beauty") || trimmedIcon.contains("care") -> return R.drawable.ic_cat_personal_care
             trimmedIcon.contains("salary") || trimmedIcon.contains("income") || trimmedIcon.contains("money") -> return R.drawable.ic_cat_salary
             trimmedIcon.contains("transfer") || trimmedIcon.contains("arrow") -> return R.drawable.ic_cat_transfer
             trimmedIcon.contains("other") || trimmedIcon.contains("more") -> return R.drawable.ic_cat_others
@@ -199,18 +218,22 @@ fun getCategoryDrawable(iconName: String?, categoryName: String? = null): Int {
     val nameKey = (categoryName ?: "").trim().lowercase(Locale.ENGLISH)
     return when {
         nameKey.contains("food") || nameKey.contains("restaurant") || nameKey.contains("dining") || nameKey.contains("swiggy") || nameKey.contains("zomato") || nameKey.contains("cafe") -> R.drawable.ic_cat_food_dining
-        nameKey.contains("grocer") || nameKey.contains("blinkit") || nameKey.contains("zepto") || nameKey.contains("instamart") -> R.drawable.ic_cat_groceries
-        nameKey.contains("shopping") || nameKey.contains("amazon") || nameKey.contains("flipkart") || nameKey.contains("myntra") -> R.drawable.ic_cat_shopping
-        nameKey.contains("travel") || nameKey.contains("flight") || nameKey.contains("irctc") || nameKey.contains("ticket") -> R.drawable.ic_cat_travel
-        nameKey.contains("fuel") || nameKey.contains("petrol") || nameKey.contains("diesel") || nameKey.contains("cng") -> R.drawable.ic_cat_fuel
-        nameKey.contains("transport") || nameKey.contains("car") || nameKey.contains("uber") || nameKey.contains("ola") || nameKey.contains("auto") || nameKey.contains("taxi") -> R.drawable.ic_cat_transport
-        nameKey.contains("bill") || nameKey.contains("utilit") || nameKey.contains("electricity") || nameKey.contains("recharge") || nameKey.contains("jio") || nameKey.contains("airtel") -> R.drawable.ic_cat_bills_utilities
-        nameKey.contains("health") || nameKey.contains("hospital") || nameKey.contains("medic") || nameKey.contains("pharmacy") || nameKey.contains("doctor") -> R.drawable.ic_cat_healthcare
-        nameKey.contains("entertain") || nameKey.contains("movie") || nameKey.contains("cinema") || nameKey.contains("netflix") || nameKey.contains("spotify") || nameKey.contains("hotstar") || nameKey.contains("prime") || nameKey.contains("game") -> R.drawable.ic_cat_entertainment
-        nameKey.contains("home") || nameKey.contains("house") || nameKey.contains("rent") || nameKey.contains("maintenance") -> R.drawable.ic_cat_home
-        nameKey.contains("educat") || nameKey.contains("school") || nameKey.contains("college") || nameKey.contains("course") || nameKey.contains("fees") || nameKey.contains("book") -> R.drawable.ic_cat_education
-        nameKey.contains("invest") || nameKey.contains("stock") || nameKey.contains("mutual") || nameKey.contains("groww") || nameKey.contains("zerodha") || nameKey.contains("sip") -> R.drawable.ic_cat_investment
-        nameKey.contains("salary") || nameKey.contains("income") || nameKey.contains("payroll") -> R.drawable.ic_cat_salary
+        nameKey.contains("grocer") || nameKey.contains("blinkit") || nameKey.contains("zepto") || nameKey.contains("instamart") || nameKey.contains("bigbasket") || nameKey.contains("dmart") -> R.drawable.ic_cat_groceries
+        nameKey.contains("shopping") || nameKey.contains("amazon") || nameKey.contains("flipkart") || nameKey.contains("myntra") || nameKey.contains("meesho") || nameKey.contains("ajio") -> R.drawable.ic_cat_shopping
+        nameKey.contains("fuel") || nameKey.contains("petrol") || nameKey.contains("diesel") || nameKey.contains("cng") || nameKey.contains("gas station") || nameKey.contains("hpcl") || nameKey.contains("bpcl") || nameKey.contains("iocl") || nameKey.contains("shell") -> R.drawable.ic_cat_fuel
+        nameKey.contains("transport") || nameKey.contains("uber") || nameKey.contains("ola") || nameKey.contains("rapido") || nameKey.contains("auto") || nameKey.contains("metro") || nameKey.contains("taxi") || nameKey.contains("cab") -> R.drawable.ic_cat_transport
+        nameKey.contains("travel") || nameKey.contains("flight") || nameKey.contains("irctc") || nameKey.contains("ticket") || nameKey.contains("indigo") || nameKey.contains("makemytrip") || nameKey.contains("hotel") -> R.drawable.ic_cat_travel
+        nameKey.contains("loan") || nameKey.contains("emi") || nameKey.contains("bajaj finance") || nameKey.contains("bajaj finserv") || nameKey.contains("hdbfs") || nameKey.contains("tvs credit") || nameKey.contains("home loan") || nameKey.contains("car loan") -> R.drawable.ic_cat_loans
+        nameKey.contains("househelp") || nameKey.contains("maid") || nameKey.contains("cook") || nameKey.contains("driver") || nameKey.contains("cleaner") || nameKey.contains("helper") || nameKey.contains("dhobi") || nameKey.contains("laundry") -> R.drawable.ic_cat_househelp
+        nameKey.contains("bill") || nameKey.contains("utilit") || nameKey.contains("electricity") || nameKey.contains("recharge") || nameKey.contains("jio") || nameKey.contains("airtel") || nameKey.contains("broadband") || nameKey.contains("water") || nameKey.contains("dth") -> R.drawable.ic_cat_bills_utilities
+        nameKey.contains("health") || nameKey.contains("hospital") || nameKey.contains("medic") || nameKey.contains("pharmacy") || nameKey.contains("doctor") || nameKey.contains("apollo") || nameKey.contains("1mg") || nameKey.contains("pharmeasy") -> R.drawable.ic_cat_healthcare
+        nameKey.contains("insuran") || nameKey.contains("lic") || nameKey.contains("policy") || nameKey.contains("hdfc ergo") || nameKey.contains("star health") || nameKey.contains("acko") -> R.drawable.ic_cat_insurance
+        nameKey.contains("personal care") || nameKey.contains("salon") || nameKey.contains("spa") || nameKey.contains("parlour") || nameKey.contains("haircut") || nameKey.contains("grooming") || nameKey.contains("barber") -> R.drawable.ic_cat_personal_care
+        nameKey.contains("entertain") || nameKey.contains("movie") || nameKey.contains("cinema") || nameKey.contains("netflix") || nameKey.contains("spotify") || nameKey.contains("hotstar") || nameKey.contains("prime") || nameKey.contains("game") || nameKey.contains("pvr") -> R.drawable.ic_cat_entertainment
+        nameKey.contains("home") || nameKey.contains("house") || nameKey.contains("rent") || nameKey.contains("maintenance") || nameKey.contains("society") -> R.drawable.ic_cat_home
+        nameKey.contains("educat") || nameKey.contains("school") || nameKey.contains("college") || nameKey.contains("course") || nameKey.contains("fees") || nameKey.contains("book") || nameKey.contains("tuition") -> R.drawable.ic_cat_education
+        nameKey.contains("invest") || nameKey.contains("stock") || nameKey.contains("mutual") || nameKey.contains("groww") || nameKey.contains("zerodha") || nameKey.contains("sip") || nameKey.contains("upstox") -> R.drawable.ic_cat_investment
+        nameKey.contains("salary") || nameKey.contains("income") || nameKey.contains("payroll") || nameKey.contains("stipend") -> R.drawable.ic_cat_salary
         nameKey.contains("transfer") || nameKey.contains("self") -> R.drawable.ic_cat_transfer
         else -> R.drawable.ic_cat_others
     }
@@ -223,12 +246,16 @@ fun getCategoryIcon(iconName: String?, categoryName: String? = null): ImageVecto
             trimmedIcon.contains("food") || trimmedIcon.contains("restaurant") || trimmedIcon.contains("dining") -> return Icons.Default.Restaurant
             trimmedIcon.contains("grocer") || trimmedIcon.contains("shopping_cart") || trimmedIcon.contains("cart") -> return Icons.Default.ShoppingCart
             trimmedIcon.contains("shopping") || trimmedIcon.contains("bag") -> return Icons.Default.ShoppingBag
-            trimmedIcon.contains("flight") || trimmedIcon.contains("travel") || trimmedIcon.contains("plane") -> return Icons.Default.Flight
-            trimmedIcon.contains("transport") || trimmedIcon.contains("car") || trimmedIcon.contains("directions_car") -> return Icons.Default.DirectionsCar
             trimmedIcon.contains("fuel") || trimmedIcon.contains("gas") || trimmedIcon.contains("petrol") -> return Icons.Default.LocalGasStation
+            trimmedIcon.contains("transport") || trimmedIcon.contains("car") || trimmedIcon.contains("directions_car") -> return Icons.Default.DirectionsCar
+            trimmedIcon.contains("flight") || trimmedIcon.contains("travel") || trimmedIcon.contains("plane") -> return Icons.Default.Flight
             trimmedIcon.contains("receipt") || trimmedIcon.contains("bill") || trimmedIcon.contains("utility") -> return Icons.Default.ReceiptLong
-            trimmedIcon.contains("esports") || trimmedIcon.contains("entertainment") || trimmedIcon.contains("movie") || trimmedIcon.contains("game") -> return Icons.Default.SportsEsports
+            trimmedIcon.contains("loan") || trimmedIcon.contains("emi") -> return Icons.Default.AccountBalance
+            trimmedIcon.contains("househelp") || trimmedIcon.contains("maid") || trimmedIcon.contains("clean") -> return Icons.Default.CleaningServices
             trimmedIcon.contains("hospital") || trimmedIcon.contains("health") || trimmedIcon.contains("medical") -> return Icons.Default.LocalHospital
+            trimmedIcon.contains("insuran") || trimmedIcon.contains("policy") || trimmedIcon.contains("security") -> return Icons.Default.Security
+            trimmedIcon.contains("personal") || trimmedIcon.contains("salon") || trimmedIcon.contains("spa") -> return Icons.Default.Spa
+            trimmedIcon.contains("esports") || trimmedIcon.contains("entertainment") || trimmedIcon.contains("movie") || trimmedIcon.contains("game") -> return Icons.Default.SportsEsports
             trimmedIcon.contains("home") || trimmedIcon.contains("house") -> return Icons.Default.Home
             trimmedIcon.contains("school") || trimmedIcon.contains("education") -> return Icons.Default.School
             trimmedIcon.contains("savings") || trimmedIcon.contains("investment") -> return Icons.Default.Savings
@@ -248,16 +275,20 @@ fun getCategoryIcon(iconName: String?, categoryName: String? = null): ImageVecto
         nameKey.contains("food") || nameKey.contains("restaurant") || nameKey.contains("dining") || nameKey.contains("swiggy") || nameKey.contains("zomato") -> Icons.Default.Restaurant
         nameKey.contains("grocer") || nameKey.contains("blinkit") || nameKey.contains("zepto") || nameKey.contains("instamart") -> Icons.Default.ShoppingCart
         nameKey.contains("shopping") || nameKey.contains("myntra") || nameKey.contains("flipkart") || nameKey.contains("amazon") -> Icons.Default.ShoppingBag
-        nameKey.contains("travel") || nameKey.contains("flight") || nameKey.contains("irctc") -> Icons.Default.Flight
         nameKey.contains("fuel") || nameKey.contains("petrol") || nameKey.contains("gas") -> Icons.Default.LocalGasStation
-        nameKey.contains("car") || nameKey.contains("transport") || nameKey.contains("uber") || nameKey.contains("ola") -> Icons.Default.DirectionsCar
+        nameKey.contains("transport") || nameKey.contains("car") || nameKey.contains("uber") || nameKey.contains("ola") -> Icons.Default.DirectionsCar
+        nameKey.contains("travel") || nameKey.contains("flight") || nameKey.contains("irctc") -> Icons.Default.Flight
+        nameKey.contains("loan") || nameKey.contains("emi") -> Icons.Default.AccountBalance
+        nameKey.contains("househelp") || nameKey.contains("maid") || nameKey.contains("cook") || nameKey.contains("driver") -> Icons.Default.CleaningServices
         nameKey.contains("receipt") || nameKey.contains("bill") || nameKey.contains("utility") || nameKey.contains("electricity") || nameKey.contains("jio") -> Icons.Default.ReceiptLong
-        nameKey.contains("esports") || nameKey.contains("entertainment") || nameKey.contains("movie") || nameKey.contains("netflix") || nameKey.contains("game") -> Icons.Default.SportsEsports
         nameKey.contains("hospital") || nameKey.contains("medical") || nameKey.contains("health") || nameKey.contains("pharmacy") -> Icons.Default.LocalHospital
-        nameKey.contains("attach_money") || nameKey.contains("salary") || nameKey.contains("income") -> Icons.Default.AttachMoney
-        nameKey.contains("savings") || nameKey.contains("investment") || nameKey.contains("stock") -> Icons.Default.Savings
+        nameKey.contains("insuran") || nameKey.contains("lic") -> Icons.Default.Security
+        nameKey.contains("personal") || nameKey.contains("salon") || nameKey.contains("spa") -> Icons.Default.Spa
+        nameKey.contains("esports") || nameKey.contains("entertainment") || nameKey.contains("movie") || nameKey.contains("netflix") || nameKey.contains("game") -> Icons.Default.SportsEsports
         nameKey.contains("home") || nameKey.contains("rent") || nameKey.contains("house") -> Icons.Default.Home
         nameKey.contains("school") || nameKey.contains("education") || nameKey.contains("book") -> Icons.Default.School
+        nameKey.contains("savings") || nameKey.contains("investment") || nameKey.contains("stock") -> Icons.Default.Savings
+        nameKey.contains("attach_money") || nameKey.contains("salary") || nameKey.contains("income") -> Icons.Default.AttachMoney
         nameKey.contains("fitness") || nameKey.contains("gym") || nameKey.contains("sport") -> Icons.Default.FitnessCenter
         nameKey.contains("transfer") -> Icons.AutoMirrored.Filled.CompareArrows
         nameKey.contains("person") || nameKey.contains("family") -> Icons.Default.Person
@@ -271,12 +302,23 @@ fun getCategoryIconAndColor(name: String, iconName: String? = null): Pair<ImageV
     val color = when (name.lowercase(Locale.ENGLISH)) {
         "spam", "ignored" -> Color(0xFF78909C)
         "food", "food & dining", "swiggy", "zomato" -> CategoryOrangeFood
+        "groceries", "grocery" -> Color(0xFF2EC4B6)
         "shopping", "amazon", "flipkart", "myntra" -> CategoryPurpleShopping
-        "travel", "uber", "ola", "flight", "irctc" -> CategoryBlueTravel
+        "fuel", "petrol" -> Color(0xFFFFAA00)
+        "transport", "uber", "ola", "rapido" -> Color(0xFF8C7CFF)
+        "travel", "flight", "irctc" -> CategoryBlueTravel
+        "loans", "loans & emi", "emi" -> Color(0xFF4F46E5)
+        "househelp", "maid" -> Color(0xFFF43F5E)
         "bills", "bills & utilities", "jio", "electricity", "recharge" -> CategoryGreenBills
+        "healthcare", "health", "medical" -> Color(0xFFFF5964)
+        "insurance", "lic" -> Color(0xFF0D9488)
+        "personal care", "salon", "spa" -> Color(0xFFEC4899)
         "entertainment", "netflix", "movies", "spotify" -> CategoryPinkEntertainment
+        "home", "home & rent", "rent" -> Color(0xFF2ECC71)
+        "education", "school" -> Color(0xFF2B8CEE)
         "salary", "income", "freelance" -> CategoryGreenBills
         "investment", "stocks", "mutual funds" -> CategoryBlueTravel
+        "transfer" -> Color(0xFF6366F1)
         else -> CategorySlateOthers
     }
     return Pair(icon, color)

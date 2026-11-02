@@ -98,16 +98,47 @@ abstract class SpendlyDatabase : RoomDatabase() {
 
     suspend fun seedDefaultCategories() {
         val defaultCategories = listOf(
-            CategoryEntity(id = 1, name = "Food & Dining", type = "EXPENSE", colorHex = "#FF7A00", iconName = "restaurant", isSystem = true, sortOrder = 1),
-            CategoryEntity(id = 2, name = "Shopping", type = "EXPENSE", colorHex = "#7C5CFC", iconName = "shopping_bag", isSystem = true, sortOrder = 2),
-            CategoryEntity(id = 3, name = "Travel", type = "EXPENSE", colorHex = "#2979FF", iconName = "flight", isSystem = true, sortOrder = 3),
-            CategoryEntity(id = 4, name = "Bills & Utilities", type = "EXPENSE", colorHex = "#00C853", iconName = "receipt_long", isSystem = true, sortOrder = 4),
-            CategoryEntity(id = 5, name = "Entertainment", type = "EXPENSE", colorHex = "#E040FB", iconName = "sports_esports", isSystem = true, sortOrder = 5),
-            CategoryEntity(id = 6, name = "Investment", type = "EXPENSE", colorHex = "#00B0FF", iconName = "savings", isSystem = true, sortOrder = 6),
-            CategoryEntity(id = 7, name = "Salary", type = "INCOME", colorHex = "#00E676", iconName = "work", isSystem = true, sortOrder = 7),
-            CategoryEntity(id = 8, name = "Others", type = "EXPENSE", colorHex = "#546E7A", iconName = "more_horiz", isSystem = true, sortOrder = 8),
-            CategoryEntity(id = 9, name = "Spam", type = "SPAM", colorHex = "#78909C", iconName = "block", isSystem = true, sortOrder = 9)
+            CategoryEntity(name = "Food & Dining", type = "EXPENSE", colorHex = "#FF7A00", iconName = "food_dining", isSystem = true, sortOrder = 1),
+            CategoryEntity(name = "Groceries", type = "EXPENSE", colorHex = "#2EC4B6", iconName = "groceries", isSystem = true, sortOrder = 2),
+            CategoryEntity(name = "Shopping", type = "EXPENSE", colorHex = "#7C5CFC", iconName = "shopping", isSystem = true, sortOrder = 3),
+            CategoryEntity(name = "Fuel", type = "EXPENSE", colorHex = "#FFAA00", iconName = "fuel", isSystem = true, sortOrder = 4),
+            CategoryEntity(name = "Transport", type = "EXPENSE", colorHex = "#8C7CFF", iconName = "transport", isSystem = true, sortOrder = 5),
+            CategoryEntity(name = "Travel", type = "EXPENSE", colorHex = "#2979FF", iconName = "travel", isSystem = true, sortOrder = 6),
+            CategoryEntity(name = "Bills & Utilities", type = "EXPENSE", colorHex = "#00C853", iconName = "bills_utilities", isSystem = true, sortOrder = 7),
+            CategoryEntity(name = "Loans & EMI", type = "EXPENSE", colorHex = "#4F46E5", iconName = "loans", isSystem = true, sortOrder = 8),
+            CategoryEntity(name = "Househelp", type = "EXPENSE", colorHex = "#F43F5E", iconName = "househelp", isSystem = true, sortOrder = 9),
+            CategoryEntity(name = "Healthcare", type = "EXPENSE", colorHex = "#FF5964", iconName = "healthcare", isSystem = true, sortOrder = 10),
+            CategoryEntity(name = "Entertainment", type = "EXPENSE", colorHex = "#E040FB", iconName = "entertainment", isSystem = true, sortOrder = 11),
+            CategoryEntity(name = "Home", type = "EXPENSE", colorHex = "#2ECC71", iconName = "home", isSystem = true, sortOrder = 12),
+            CategoryEntity(name = "Education", type = "EXPENSE", colorHex = "#2B8CEE", iconName = "education", isSystem = true, sortOrder = 13),
+            CategoryEntity(name = "Investment", type = "EXPENSE", colorHex = "#00B0FF", iconName = "investment", isSystem = true, sortOrder = 14),
+            CategoryEntity(name = "Insurance", type = "EXPENSE", colorHex = "#0D9488", iconName = "insurance", isSystem = true, sortOrder = 15),
+            CategoryEntity(name = "Personal Care", type = "EXPENSE", colorHex = "#EC4899", iconName = "personal_care", isSystem = true, sortOrder = 16),
+            CategoryEntity(name = "Salary", type = "INCOME", colorHex = "#00E676", iconName = "salary", isSystem = true, sortOrder = 17),
+            CategoryEntity(name = "Transfer", type = "EXPENSE", colorHex = "#6366F1", iconName = "transfer", isSystem = true, sortOrder = 18),
+            CategoryEntity(name = "Others", type = "EXPENSE", colorHex = "#546E7A", iconName = "others", isSystem = true, sortOrder = 19),
+            CategoryEntity(name = "Spam", type = "SPAM", colorHex = "#78909C", iconName = "block", isSystem = true, sortOrder = 20)
         )
-        categoryDao().insertAll(defaultCategories)
+        val categoryDao = categoryDao()
+        for (cat in defaultCategories) {
+            val existing = categoryDao.getCategoryByName(cat.name)
+            if (existing == null) {
+                val alias = when (cat.name) {
+                    "Groceries" -> categoryDao.getCategoryByName("Grocery")
+                    "Loans & EMI" -> categoryDao.getCategoryByName("Loans") ?: categoryDao.getCategoryByName("Loan")
+                    "Home" -> categoryDao.getCategoryByName("Home & Rent")
+                    else -> null
+                }
+                if (alias != null) {
+                    categoryDao.update(alias.copy(iconName = cat.iconName, colorHex = cat.colorHex))
+                } else {
+                    categoryDao.insert(cat)
+                }
+            } else {
+                if (existing.iconName != cat.iconName || existing.colorHex != cat.colorHex) {
+                    categoryDao.update(existing.copy(iconName = cat.iconName, colorHex = cat.colorHex))
+                }
+            }
+        }
     }
 }

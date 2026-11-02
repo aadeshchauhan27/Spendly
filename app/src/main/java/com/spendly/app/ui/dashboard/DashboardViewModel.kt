@@ -1,6 +1,7 @@
 package com.spendly.app.ui.dashboard
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -141,8 +142,12 @@ class DashboardViewModel(
 
     fun syncTransactionsFromSms(context: Context, force: Boolean = false) {
         viewModelScope.launch {
-            if (_isSyncing.value) return@launch
+            if (_isSyncing.value) {
+                Log.d("DashboardViewModel", "Already syncing, skipping")
+                return@launch
+            }
             _isSyncing.value = true
+            Log.d("DashboardViewModel", "Starting SMS sync...")
             _syncMessage.value = "Reading SMS transactions from phone..."
             try {
                 val categories = repository.getAllCategoriesFlow().first()
@@ -151,10 +156,12 @@ class DashboardViewModel(
 
                 _syncMessage.value = "Parsing and categorizing bank messages..."
                 val scanResult = SmsReader.scanInbox(context, existing, categories, deletedTransactions = deleted, maxDays = 365)
+                Log.d("DashboardViewModel", "SMS scanned: found ${scanResult.items.size} total items, duplicates: ${scanResult.duplicateCount}")
                 val newTransactions = scanResult.items
                     .filter { it.isSelected && it.transaction != null }
                     .mapNotNull { it.transaction }
 
+                Log.d("DashboardViewModel", "New valid transactions to insert: ${newTransactions.size}")
                 if (newTransactions.isNotEmpty()) {
                     _syncMessage.value = "Saving ${newTransactions.size} transactions..."
                     repository.batchInsertTransactions(
@@ -164,10 +171,11 @@ class DashboardViewModel(
                         duplicateCount = scanResult.duplicateCount,
                         errorCount = 0
                     )
+                    Log.d("DashboardViewModel", "Inserted ${newTransactions.size} transactions successfully")
                 }
                 repository.deduplicateDatabaseTransactions()
             } catch (e: Exception) {
-                // Silently finish
+                Log.e("DashboardViewModel", "Error in syncTransactionsFromSms", e)
             } finally {
                 _isSyncing.value = false
             }

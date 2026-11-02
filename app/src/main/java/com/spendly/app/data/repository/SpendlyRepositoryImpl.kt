@@ -567,7 +567,8 @@ class SpendlyRepositoryImpl(
                     val updated = tx.copy(
                         title = if (!TransactionDeduplicator.isGenericMerchant(parsed.title)) parsed.title else tx.title,
                         counterpartyName = if (!TransactionDeduplicator.isGenericMerchant(parsed.counterpartyName)) parsed.counterpartyName else tx.counterpartyName,
-                        bankReferenceNum = if (hasPhoneUtr) parsed.bankReferenceNum else tx.bankReferenceNum
+                        counterpartyUpiId = if (tx.counterpartyUpiId.isNullOrBlank()) parsed.counterpartyUpiId else tx.counterpartyUpiId,
+                        bankReferenceNum = if (hasPhoneUtr || tx.bankReferenceNum.isNullOrBlank()) parsed.bankReferenceNum else tx.bankReferenceNum
                     )
                     transactionDao.update(updated.toEntity())
                 }

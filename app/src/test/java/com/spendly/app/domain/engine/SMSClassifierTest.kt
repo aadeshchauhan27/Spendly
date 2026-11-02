@@ -23,8 +23,18 @@ class SMSClassifierTest {
         Category(id = 6, name = "Investment", type = "EXPENSE", colorHex = "#00B0FF", iconName = "savings", isSystem = true, sortOrder = 6),
         Category(id = 7, name = "Salary", type = "INCOME", colorHex = "#00E676", iconName = "work", isSystem = true, sortOrder = 7),
         Category(id = 8, name = "Others", type = "EXPENSE", colorHex = "#546E7A", iconName = "more_horiz", isSystem = true, sortOrder = 8),
-        Category(id = 10, name = "Refund", type = "REFUND", colorHex = "#26A69A", iconName = "replay", isSystem = true, sortOrder = 10),
-        Category(id = 11, name = "Cashback", type = "INCOME", colorHex = "#FFA726", iconName = "redeem", isSystem = true, sortOrder = 11)
+        Category(id = 9, name = "Fuel", type = "EXPENSE", colorHex = "#FFAA00", iconName = "fuel", isSystem = true, sortOrder = 9),
+        Category(id = 10, name = "Groceries", type = "EXPENSE", colorHex = "#2EC4B6", iconName = "groceries", isSystem = true, sortOrder = 10),
+        Category(id = 11, name = "Loans & EMI", type = "EXPENSE", colorHex = "#4F46E5", iconName = "loans", isSystem = true, sortOrder = 11),
+        Category(id = 12, name = "Househelp", type = "EXPENSE", colorHex = "#F43F5E", iconName = "househelp", isSystem = true, sortOrder = 12),
+        Category(id = 13, name = "Healthcare", type = "EXPENSE", colorHex = "#FF5964", iconName = "healthcare", isSystem = true, sortOrder = 13),
+        Category(id = 14, name = "Home", type = "EXPENSE", colorHex = "#2ECC71", iconName = "home", isSystem = true, sortOrder = 14),
+        Category(id = 15, name = "Education", type = "EXPENSE", colorHex = "#2B8CEE", iconName = "education", isSystem = true, sortOrder = 15),
+        Category(id = 16, name = "Insurance", type = "EXPENSE", colorHex = "#0D9488", iconName = "insurance", isSystem = true, sortOrder = 16),
+        Category(id = 17, name = "Personal Care", type = "EXPENSE", colorHex = "#EC4899", iconName = "personal_care", isSystem = true, sortOrder = 17),
+        Category(id = 18, name = "Transfer", type = "EXPENSE", colorHex = "#6366F1", iconName = "transfer", isSystem = true, sortOrder = 18),
+        Category(id = 19, name = "Refund", type = "REFUND", colorHex = "#26A69A", iconName = "replay", isSystem = true, sortOrder = 19),
+        Category(id = 20, name = "Cashback", type = "INCOME", colorHex = "#FFA726", iconName = "redeem", isSystem = true, sortOrder = 20)
     )
 
     // =========================================================================
@@ -46,6 +56,8 @@ class SMSClassifierTest {
         assertEquals("429812345678", tx.bankReferenceNum)
         assertEquals("1234", result.accountEnding)
     }
+
+
 
     @Test
     fun classify_upiPaymentSwiggy_extractsSwiggyAndFoodCategory() {
@@ -87,7 +99,7 @@ class SMSClassifierTest {
     }
 
     @Test
-    fun classify_loanEmiDebited_extractsBillsAndUtilities() {
+    fun classify_loanEmiDebited_extractsLoansAndEmi() {
         val sms = "Loan EMI of Rs 14,500 successfully debited from your HDFC Bank account **7862 for loan A/c 889900."
         val result = SMSClassifier.classify("AD-HDFCBK", sms, availableCategories = categories)
 
@@ -95,7 +107,8 @@ class SMSClassifierTest {
         val tx = result.transaction!!
         assertEquals(1450000L, tx.amountPaise)
         assertEquals(TransactionType.EXPENSE, tx.type)
-        assertEquals(4L, tx.categoryId) // Bills & Utilities
+        assertEquals(11L, tx.categoryId) // Loans & EMI
+        assertEquals("Loans & EMI", tx.categoryName)
     }
 
     @Test
@@ -604,5 +617,34 @@ class SMSClassifierTest {
         assertEquals(3301500L, tx.amountPaise)
         assertEquals("A/c ending **3721", tx.notes)
         assertNull("917036165000 is a WhatsApp contact number, not a UTR", tx.bankReferenceNum)
+    }
+
+    @Test
+    fun classify_nov2HdfcDeposit_extractsMonikaSinghParihar() {
+        val sms = "Update! INR 8,00,000.00 deposited in HDFC Bank A/c XX7862 on 02-NOV-26 for XXXXXXXXXX2364-TPT-HDFC28A2AD07A5DF-MONIKA SINGH PARIHAR.Avl bal INR 8,02,272.68. Cheque deposits in A/C are subject to clearing"
+        val result = SMSClassifier.classify("VM-HDFCBK-S", sms, availableCategories = categories)
+        assertTrue(result.isFinancialTransaction)
+        val tx = result.transaction!!
+        assertEquals("Monika Singh Parihar", tx.counterpartyName)
+        assertEquals(80000000L, tx.amountPaise)
+        assertEquals(TransactionDirection.INCOMING, tx.direction)
+    }
+
+    @Test
+    fun classify_nov2HdfcImps_extractsMonikaSinghPariharAndUtr() {
+        val sms = """
+            Received!
+            INR 500.00 in HDFC Bank A/c xx7862
+            On 02-11-26
+            For IMPS -MONIKA SINGH PARIHAR- F63060674766
+            Avl bal INR 2,272.68
+        """.trimIndent()
+        val result = SMSClassifier.classify("VD-HDFCBK-S", sms, availableCategories = categories)
+        assertTrue(result.isFinancialTransaction)
+        val tx = result.transaction!!
+        assertEquals("Monika Singh Parihar", tx.counterpartyName)
+        assertEquals(50000L, tx.amountPaise)
+        assertEquals(TransactionDirection.INCOMING, tx.direction)
+        assertEquals("F63060674766", tx.bankReferenceNum)
     }
 }

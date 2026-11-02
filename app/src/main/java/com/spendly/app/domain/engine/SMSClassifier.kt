@@ -698,10 +698,30 @@ object SMSClassifier {
             }
         }
 
-        // 0b. NEFT / IMPS Info pattern (e.g. Info: NEFT/ IDFB6255M9598844/PRIYANKA NITIN GUPTA)
-        val neftMatcher = Pattern.compile("(?i)Info:\\s*(?:NEFT|IMPS)/[A-Za-z0-9]+/([A-Za-z0-9&.\\s]+?)(?:/|$)").matcher(content)
+        // 0b. NEFT / IMPS Info pattern (e.g. Info: NEFT/ IDFB6255M9598844/PRIYANKA NITIN GUPTA, Ref: NEFT/CHASH.../FQ I.)
+        val neftMatcher = Pattern.compile("(?i)(?:Info[:\\s-]+|Ref[:\\s-]+)?(?:NEFT|IMPS)/[A-Za-z0-9]+/([A-Za-z0-9&.\\s]+?)(?:/|\\.View|\\.|\$)").matcher(content)
         if (neftMatcher.find()) {
             val name = neftMatcher.group(1)?.trim()
+            if (!name.isNullOrBlank()) {
+                val cleaned = cleanExtractedMerchant(name)
+                if (cleaned.isNotBlank() && cleaned.length >= 2) return cleaned
+            }
+        }
+
+        // 0c. IMPS Narration pattern (e.g. For IMPS -MONIKA SINGH PARIHAR- F63060674766)
+        val impsMatcher = Pattern.compile("(?i)(?:For\\s+)?IMPS\\s*-\\s*([A-Za-z0-9&.\\s]+?)\\s*-\\s*[A-Za-z0-9]+").matcher(content)
+        if (impsMatcher.find()) {
+            val name = impsMatcher.group(1)?.trim()
+            if (!name.isNullOrBlank()) {
+                val cleaned = cleanExtractedMerchant(name)
+                if (cleaned.isNotBlank() && cleaned.length >= 2) return cleaned
+            }
+        }
+
+        // 0d. Account Transfer / TPT pattern (e.g. for XXXXXXXXXX2364-TPT-HDFC...-MONIKA SINGH PARIHAR)
+        val tptMatcher = Pattern.compile("(?i)\\bfor\\s+(?:[A-Za-z0-9*X]+-)+(?:[A-Za-z0-9]+-)?([A-Za-z\\s]+?)(?:\\.Avl|\\.|\\r?\\n|\$)").matcher(content)
+        if (tptMatcher.find()) {
+            val name = tptMatcher.group(1)?.trim()
             if (!name.isNullOrBlank()) {
                 val cleaned = cleanExtractedMerchant(name)
                 if (cleaned.isNotBlank() && cleaned.length >= 2) return cleaned
@@ -771,9 +791,9 @@ object SMSClassifier {
 
         // 4. Try Preposition patterns: "to SWIGGY", "at AMAZON", "towards Google", "from RAJESH"
         val prepPattern = if (direction == TransactionDirection.OUTGOING) {
-            Pattern.compile("(?i)(?:towards|to|at|info:|for)\\s+([A-Za-z0-9&.\\s]+?)(?:\\s+for\\s+(?:rs|inr|₹)|\\s+on\\s+\\d{1,2}[-/]|\\s+via|\\s+using|\\s+upi|\\s+ref|\\s+avl|\\s+bal|\\.|$)")
+            Pattern.compile("(?i)(?:towards|to|at|info:|for)\\s+([*A-Za-z0-9&.\\s]+?)(?:\\s+for\\s+(?:rs|inr|₹)|\\s+on\\s+\\d{1,2}[-/]|\\s+via|\\s+using|\\s+upi|\\s+ref|\\s+avl|\\s+bal|\\.|$)")
         } else {
-            Pattern.compile("(?i)(?:from|by|transfer from|received from|sent by)\\s+([A-Za-z0-9&.\\s]+?)(?:\\s+on|\\s+via|\\s+using|\\s+upi|\\s+ref|\\s+avl|\\s+bal|\\.|$)")
+            Pattern.compile("(?i)(?:from\\s+vpa|from|by|transfer from|received from|sent by)\\s+([*A-Za-z0-9&.\\-_@\\s]+?)(?:\\s+\\(upi|\\s+on|\\s+via|\\s+using|\\s+upi|\\s+ref|\\s+avl|\\s+bal|\\.|$)")
         }
 
         val prepMatcher = prepPattern.matcher(content)
@@ -810,6 +830,13 @@ object SMSClassifier {
             }
         }
 
+        if (direction == TransactionDirection.INCOMING) {
+            val vpa = extractUpiVpa(content)
+            if (!vpa.isNullOrBlank()) {
+                return vpa
+            }
+        }
+
         return if (direction == TransactionDirection.INCOMING) "Money Received" else "UPI Payment"
     }
 
@@ -817,6 +844,7 @@ object SMSClassifier {
         val cleaned = raw.replace(Pattern.compile("(?i)^(?:a/c|vpa|info|vpa:|upi:|upi_|@upi_|@|upi\\s+)\\s*").toRegex(), "")
             .replace(Pattern.compile("(?i)\\s+(?:not\\s+you|sms\\s+block|blockupi|cust\\s+id|ref|utr|rrn|no|media\\s+priva|pvt\\s+ltd|ltd).*$").toRegex(), "")
             .trim()
+            .trimStart('*')
 
         if (cleaned.matches(Regex("^[0-9+\\s-]+$"))) return ""
         val lower = cleaned.lowercase(Locale.ENGLISH)
@@ -842,6 +870,10 @@ object SMSClassifier {
         if (neftRefMatcher.find()) {
             return neftRefMatcher.group(1)?.trim()
         }
+        val impsRefMatcher = Pattern.compile("(?i)(?:For\\s+)?IMPS\\s*-[A-Za-z0-9&.\\s]+?-\\s*([A-Za-z0-9]{10,22})").matcher(content)
+        if (impsRefMatcher.find()) {
+            return impsRefMatcher.group(1)?.trim()
+        }
         val standalone = STANDALONE_12_DIGIT_REGEX.matcher(content)
         while (standalone.find()) {
             val candidate = standalone.group(1)?.trim() ?: continue
@@ -864,8 +896,8 @@ object SMSClassifier {
     }
 
     private fun extractUpiVpa(content: String): String? {
-        val matcher = Pattern.compile("([a-zA-Z0-9.\\-_]+@[a-zA-Z0-9]+)").matcher(content)
-        return if (matcher.find()) matcher.group(1)?.trim() else null
+        val matcher = Pattern.compile("([*a-zA-Z0-9.\\-_]+@[a-zA-Z0-9]+)").matcher(content)
+        return if (matcher.find()) matcher.group(1)?.trim()?.trimStart('*') else null
     }
 
     private fun extractAccountEnding(content: String): String? {
@@ -1079,48 +1111,94 @@ object SMSClassifier {
         val text = (counterparty + " " + content).lowercase(Locale.ENGLISH)
 
         return when {
+            text.contains("blinkit") || text.contains("zepto") || text.contains("instamart") ||
+                    text.contains("bigbasket") || text.contains("dmart") || text.contains("groceries") ||
+                    text.contains("grocery") || text.contains("supermarket") || text.contains("vegetable") ||
+                    text.contains("fruits") ->
+                findCat("Groceries", 2L, "#2EC4B6")
+
+            text.contains("petrol") || text.contains("fuel") || text.contains("diesel") ||
+                    text.contains("cng") || text.contains("shell") || text.contains("indian oil") ||
+                    text.contains("hpcl") || text.contains("bpcl") || text.contains("iocl") ->
+                findCat("Fuel", 4L, "#FFAA00")
+
+            text.contains("loan") || text.contains("emi") || text.contains("bajaj finance") ||
+                    text.contains("bajaj finserv") || text.contains("hdbfs") || text.contains("tvs credit") ||
+                    text.contains("home loan") || text.contains("car loan") || text.contains("muthoot") ->
+                findCat("Loans & EMI", 8L, "#4F46E5")
+
+            text.contains("maid") || text.contains("cook") || text.contains("driver") ||
+                    text.contains("cleaner") || text.contains("househelp") || text.contains("urban company") ||
+                    text.contains("dhobi") || text.contains("laundry") ->
+                findCat("Househelp", 9L, "#F43F5E")
+
+            text.contains("apollo") || text.contains("pharmeasy") || text.contains("1mg") ||
+                    text.contains("netmeds") || text.contains("pharmacy") || text.contains("hospital") ||
+                    text.contains("clinic") || text.contains("doctor") || text.contains("diagnostic") ||
+                    text.contains("medical") || text.contains("medplus") ->
+                findCat("Healthcare", 10L, "#FF5964")
+
+            text.contains("lic") || text.contains("insurance") || text.contains("hdfc ergo") ||
+                    text.contains("star health") || text.contains("policybazaar") ||
+                    text.contains("care health") || text.contains("acko") ->
+                findCat("Insurance", 15L, "#0D9488")
+
+            text.contains("salon") || text.contains("parlour") || text.contains("spa") ||
+                    text.contains("haircut") || text.contains("barber") || text.contains("grooming") ->
+                findCat("Personal Care", 16L, "#EC4899")
+
+            text.contains("uber") || text.contains("ola") || text.contains("rapido") ||
+                    text.contains("metro") || text.contains("auto") || text.contains("taxi") ||
+                    text.contains("cab") ->
+                findCat("Transport", 5L, "#8C7CFF")
+
+            text.contains("flight") || text.contains("irctc") || text.contains("makemytrip") ||
+                    text.contains("indigo") || text.contains("air india") || text.contains("cleartrip") ||
+                    text.contains("easemytrip") || text.contains("hotel") ->
+                findCat("Travel", 6L, "#2979FF")
+
             text.contains("swiggy") || text.contains("zomato") || text.contains("starbucks") ||
                     text.contains("mcdonald") || text.contains("burger") || text.contains("pizza") ||
                     text.contains("cafe") || text.contains("restaurant") || text.contains("chai") ||
                     text.contains("dining") || text.contains("food") || text.contains("bakery") ||
-                    text.contains("blinkit") || text.contains("zepto") || text.contains("instamart") ||
-                    text.contains("pan shop") || text.contains("fruits") || text.contains("groceries") ->
+                    text.contains("pan shop") ->
                 findCat("Food & Dining", 1L, "#FF7A00")
 
             text.contains("amazon") || text.contains("flipkart") || text.contains("myntra") ||
                     text.contains("meesho") || text.contains("zara") || text.contains("ajio") ||
                     text.contains("nykaa") || text.contains("shopping") || text.contains("retail") ||
                     text.contains("store") ->
-                findCat("Shopping", 2L, "#7C5CFC")
-
-            text.contains("uber") || text.contains("ola") || text.contains("rapido") ||
-                    text.contains("metro") || text.contains("petrol") || text.contains("fuel") ||
-                    text.contains("shell") || text.contains("indian oil") || text.contains("hpcl") ||
-                    text.contains("bpcl") || text.contains("flight") || text.contains("irctc") ||
-                    text.contains("makemytrip") || text.contains("indigo") ->
-                findCat("Travel", 3L, "#2979FF")
+                findCat("Shopping", 3L, "#7C5CFC")
 
             text.contains("bescom") || text.contains("electricity") || text.contains("airtel") ||
                     text.contains("jio") || text.contains("vi") || text.contains("vodafone") ||
-                    text.contains("broadband") || text.contains("water") || text.contains("gas") ||
+                    text.contains("broadband") || text.contains("water") || text.contains("gas bill") ||
                     text.contains("bill") || text.contains("recharge") || text.contains("tata play") ||
-                    text.contains("dth") || text.contains("hdfc bank") || text.contains("nach") ||
-                    text.contains("ach") || text.contains("cred") || text.contains("medical") ->
-                findCat("Bills & Utilities", 4L, "#00C853")
+                    text.contains("dth") ->
+                findCat("Bills & Utilities", 7L, "#00C853")
 
             text.contains("netflix") || text.contains("spotify") || text.contains("bookmyshow") ||
                     text.contains("cinema") || text.contains("prime") || text.contains("youtube") ||
                     text.contains("pvr") || text.contains("inox") || text.contains("hotstar") ||
                     text.contains("movie") || text.contains("game") ->
-                findCat("Entertainment", 5L, "#E040FB")
+                findCat("Entertainment", 11L, "#E040FB")
+
+            text.contains("rent") || text.contains("nobroker") || text.contains("maintenance") ||
+                    text.contains("society") || text.contains("house") ->
+                findCat("Home", 12L, "#2ECC71")
+
+            text.contains("school") || text.contains("college") || text.contains("university") ||
+                    text.contains("course") || text.contains("udemy") || text.contains("coursera") ||
+                    text.contains("tuition") || text.contains("fees") || text.contains("book") ->
+                findCat("Education", 13L, "#2B8CEE")
 
             text.contains("zerodha") || text.contains("groww") || text.contains("mutual") ||
                     text.contains("fund") || text.contains("sip") || text.contains("upstox") ||
                     text.contains("coin") ->
-                findCat("Investment", 6L, "#00B0FF")
+                findCat("Investment", 14L, "#00B0FF")
 
             else ->
-                findCat("Others", 8L, "#546E7A")
+                findCat("Others", 19L, "#546E7A")
         }
     }
 

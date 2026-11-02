@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -17,8 +18,8 @@ import com.spendly.app.domain.model.formatPaiseToRupees
 
 object SpendlyNotificationManager {
 
-    const val CHANNEL_ID_SPENDING = "spendly_spending_alerts"
-    const val CHANNEL_NAME_SPENDING = "Spending Summaries & Alerts"
+    const val CHANNEL_ID_SPENDING = "spendly_updates_v4"
+    const val CHANNEL_NAME_SPENDING = "Spendly Updates"
 
     const val NOTIFICATION_ID_DAILY = 1001
     const val NOTIFICATION_ID_WEEKLY = 1002
@@ -28,11 +29,12 @@ object SpendlyNotificationManager {
             val channel = NotificationChannel(
                 CHANNEL_ID_SPENDING,
                 CHANNEL_NAME_SPENDING,
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Daily and weekly spending summaries to help you stay on budget"
+                description = "Account activity and transaction updates"
                 enableLights(true)
                 enableVibration(true)
+                setShowBadge(true)
             }
 
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -59,7 +61,7 @@ object SpendlyNotificationManager {
         )
 
         val formattedAmount = formatPaiseToRupees(spentPaise)
-        val title = if (spentPaise > 0) "Daily Spending: $formattedAmount" else "No Spending Today 🎉"
+        val title = if (spentPaise > 0) "Daily Spend: $formattedAmount" else "Spendly: No Expenses Today"
         val message = if (spentPaise > 0) {
             if (transactionCount > 0) {
                 "You've spent $formattedAmount today across $transactionCount transactions. Tap to review."
@@ -70,14 +72,26 @@ object SpendlyNotificationManager {
             "Zero expenses recorded today! Great job saving."
         }
 
+        val largeIcon = try {
+            BitmapFactory.decodeResource(context.resources, R.drawable.spendly_splash_logo)
+        } catch (e: Exception) {
+            null
+        }
+
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_SPENDING)
             .setSmallIcon(R.drawable.ic_notification_spendly)
+            .setColor(0xFF00D09E.toInt())
             .setContentTitle(title)
             .setContentText(message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+            .apply {
+                if (largeIcon != null) setLargeIcon(largeIcon)
+            }
             .build()
 
         NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_DAILY, notification)
@@ -102,21 +116,33 @@ object SpendlyNotificationManager {
         )
 
         val formattedAmount = formatPaiseToRupees(spentPaise)
-        val title = "Weekly Spending: $formattedAmount"
+        val title = "Weekly Spend: $formattedAmount"
         val message = if (transactionCount > 0) {
             "You spent $formattedAmount over the last 7 days across $transactionCount transactions. Tap to see insights."
         } else {
             "You spent $formattedAmount over the last 7 days. Tap to check your category breakdown."
         }
 
+        val largeIcon = try {
+            BitmapFactory.decodeResource(context.resources, R.drawable.spendly_splash_logo)
+        } catch (e: Exception) {
+            null
+        }
+
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_SPENDING)
             .setSmallIcon(R.drawable.ic_notification_spendly)
+            .setColor(0xFF00D09E.toInt())
             .setContentTitle(title)
             .setContentText(message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+            .apply {
+                if (largeIcon != null) setLargeIcon(largeIcon)
+            }
             .build()
 
         NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_WEEKLY, notification)

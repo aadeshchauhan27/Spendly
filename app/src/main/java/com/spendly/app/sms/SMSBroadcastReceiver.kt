@@ -31,7 +31,8 @@ class SMSBroadcastReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "SMSBroadcastReceiver"
-        private const val CHANNEL_ID = "spendly_transactions"
+        private const val CHANNEL_ID = "spendly_transactions_live"
+        private const val CHANNEL_NAME = "Transaction Updates"
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -112,8 +113,8 @@ class SMSBroadcastReceiver : BroadcastReceiver() {
                         val newId = transactionDao.insert(entity)
                         Log.d(TAG, "Auto-saved transaction ID $newId from $sender: ${transaction.formattedRupees}")
 
-                        // Post local notification to alert user
-                        showTransactionNotification(context, transaction)
+                        // Post local notification to alert user with the inserted transaction ID
+                        showTransactionNotification(context, transaction.copy(id = newId))
                     }
                 }
             } catch (e: Exception) {
@@ -131,10 +132,13 @@ class SMSBroadcastReceiver : BroadcastReceiver() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val channel = NotificationChannel(
                     CHANNEL_ID,
-                    "Transaction Alerts",
-                    NotificationManager.IMPORTANCE_DEFAULT
+                    CHANNEL_NAME,
+                    NotificationManager.IMPORTANCE_HIGH
                 ).apply {
-                    description = "Alerts for newly detected UPI & Bank SMS transactions"
+                    description = "Instant alerts for newly detected UPI & Bank SMS transactions"
+                    enableLights(true)
+                    enableVibration(true)
+                    setShowBadge(true)
                 }
                 notificationManager.createNotificationChannel(channel)
             }
@@ -165,18 +169,21 @@ class SMSBroadcastReceiver : BroadcastReceiver() {
 
             val builder = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification_spendly)
-                .setColor(0xFF09142A.toInt())
+                .setColor(0xFF00D09E.toInt())
                 .setContentTitle(title)
                 .setContentText(text)
                 .setAutoCancel(true)
                 .setContentIntent(pendingIntent)
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_STATUS)
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
 
             if (largeIcon != null) {
                 builder.setLargeIcon(largeIcon)
             }
 
-            notificationManager.notify(tx.id.toInt(), builder.build())
+            val notifId = if (tx.id != 0L) tx.id.toInt() else (System.currentTimeMillis() % 100000).toInt()
+            notificationManager.notify(notifId, builder.build())
         } catch (e: Exception) {
             Log.e(TAG, "Failed to show notification", e)
         }
