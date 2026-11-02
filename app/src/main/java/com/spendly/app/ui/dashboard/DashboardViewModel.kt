@@ -47,7 +47,7 @@ class DashboardViewModel(
 
     init {
         viewModelScope.launch {
-            repository.seedDemoData()
+            repository.deduplicateDatabaseTransactions()
         }
     }
 
@@ -165,6 +165,7 @@ class DashboardViewModel(
                         errorCount = 0
                     )
                 }
+                repository.deduplicateDatabaseTransactions()
             } catch (e: Exception) {
                 // Silently finish
             } finally {

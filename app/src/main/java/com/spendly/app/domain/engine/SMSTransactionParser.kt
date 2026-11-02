@@ -45,6 +45,9 @@ object SMSTransactionParser {
         if (tx.type == TransactionType.SPAM && !includeSpam) {
             return null
         }
+        if (tx.status == com.spendly.app.domain.model.TransactionStatus.FAILED) {
+            return null
+        }
         return tx
     }
 

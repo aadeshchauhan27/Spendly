@@ -102,6 +102,9 @@ object SmsReader {
                     )
 
                     if (transaction != null) {
+                        if (transaction.status == com.spendly.app.domain.model.TransactionStatus.FAILED) {
+                            continue
+                        }
                         if (dedupIndex.isDeleted(transaction)) {
                             // User explicitly deleted this transaction previously. Permanently skip!
                             continue
@@ -112,6 +115,18 @@ object SmsReader {
 
                         if (duplicate != null) {
                             duplicateCount++
+                            // If candidate transaction has richer metadata (e.g. specific merchant vs generic), upgrade it
+                            if (TransactionDeduplicator.shouldPreferCandidate(transaction, duplicate)) {
+                                val existingIdx = items.indexOfFirst {
+                                    it.transaction?.amountPaise == duplicate.amountPaise &&
+                                    TransactionDeduplicator.isSameCalendarDay(it.dateMs, duplicate.timestampMs)
+                                }
+                                if (existingIdx != -1) {
+                                    items[existingIdx] = items[existingIdx].copy(
+                                        transaction = transaction
+                                    )
+                                }
+                            }
                             items.add(
                                 DetectedSmsItem(
                                     smsId = id,

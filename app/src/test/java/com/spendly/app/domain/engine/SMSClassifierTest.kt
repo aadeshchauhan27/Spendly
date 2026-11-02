@@ -287,6 +287,25 @@ class SMSClassifierTest {
         val result5 = SMSClassifier.classify("JM-ICICIB", autopayAlert, availableCategories = categories)
         assertFalse(result5.isFinancialTransaction)
         assertEquals(NoiseCategory.BILL_PAYMENT_REMINDER, result5.noiseCategory)
+
+        // Credit Card payment received acknowledgment (bill settlement)
+        val ccPaymentReceived = "Payment of Rs 5,442.35 has been received on your ICICI Bank Credit Card XX0006 through Bharat Bill Payment System"
+        val result6 = SMSClassifier.classify("JM-ICICIB", ccPaymentReceived, availableCategories = categories)
+        assertFalse(result6.isFinancialTransaction)
+        assertEquals(NoiseCategory.BILL_PAYMENT_REMINDER, result6.noiseCategory)
+
+        // Missed EMI reminder with 'we will debit'
+        val emiMissed = "EMI Missed: We will debit EMI for your HDFC Bank Loan A/c XX3306 . Please maintain Rs.54,708.00 in your account"
+        val result7 = SMSClassifier.classify("AD-HDFCBK", emiMissed, availableCategories = categories)
+        assertFalse(result7.isFinancialTransaction)
+        assertEquals(NoiseCategory.BILL_PAYMENT_REMINDER, result7.noiseCategory)
+
+        // Returned NACH debit
+        val nachReturned = "NACH debit towards HDFC BANK LTD for INR 33,015.00 with UMRN UTIB0000000009110862 has been returned today - Axis Bank"
+        val result8 = SMSClassifier.classify("AX-AXISBK", nachReturned, availableCategories = categories)
+        assertTrue(result8.isFinancialTransaction)
+        val tx = SMSTransactionParser.parseSms("AX-AXISBK", nachReturned, availableCategories = categories)
+        assertNull("Failed or returned transactions must not be returned by parseSms", tx)
     }
 
     @Test
@@ -565,5 +584,25 @@ class SMSClassifierTest {
 
         assertTrue(TransactionDeduplicator.shouldPreferCandidate(bankConfirmation, initiated))
         assertFalse(TransactionDeduplicator.shouldPreferCandidate(initiated, bankConfirmation))
+    }
+
+    @Test
+    fun classification_extractsAchMerchantAndIgnoresPhoneUtr() {
+        val sms = """
+            Debit INR 33015.00
+            Axis Bank A/c XX3721
+            27-10-26 08:13:42
+            ACH-DR-HDFC BANK LTD-48116
+            WhatsApp BAL to 917036165000
+            Not You? SMS BLOCKALL CustID to 919951860002
+        """.trimIndent()
+
+        val result = SMSClassifier.classify("AX-AXISBK", sms, availableCategories = categories)
+        assertTrue(result.isFinancialTransaction)
+        val tx = result.transaction!!
+        assertEquals("HDFC Bank", tx.counterpartyName)
+        assertEquals(3301500L, tx.amountPaise)
+        assertEquals("A/c ending **3721", tx.notes)
+        assertNull("917036165000 is a WhatsApp contact number, not a UTR", tx.bankReferenceNum)
     }
 }

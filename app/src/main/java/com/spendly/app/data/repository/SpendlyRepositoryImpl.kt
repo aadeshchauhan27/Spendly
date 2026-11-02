@@ -522,4 +522,58 @@ class SpendlyRepositoryImpl(
         
         return Result.success(insertedIds)
     }
+
+    override suspend fun deduplicateDatabaseTransactions(): Int {
+        transactionDao.markFailedTransactions()
+        transactionDao.deleteFailedTransactions()
+        transactionDao.cleanupCcSettlementDuplicates()
+        transactionDao.cleanupUpcomingMandates()
+
+        val allEntities = transactionDao.getAllTransactionsList()
+        val allTx = allEntities.map { it.toDomain() }
+        val toDelete = mutableListOf<Long>()
+        val kept = mutableListOf<Transaction>()
+
+        for (tx in allTx) {
+            val duplicate = TransactionDeduplicator.findDuplicate(tx, kept)
+            if (duplicate != null) {
+                if (TransactionDeduplicator.shouldPreferCandidate(tx, duplicate)) {
+                    toDelete.add(duplicate.id)
+                    kept.remove(duplicate)
+                    kept.add(tx)
+                    transactionDao.update(tx.copy(id = duplicate.id).toEntity())
+                } else {
+                    toDelete.add(tx.id)
+                }
+            } else {
+                kept.add(tx)
+            }
+        }
+
+        toDelete.distinct().forEach { id ->
+            transactionDao.deleteById(id)
+        }
+
+        // Also fix any transactions that have generic title but specific ACH/NACH merchant in tag/body, or false phone UTR
+        for (tx in kept) {
+            val hasPhoneUtr = tx.bankReferenceNum?.startsWith("91") == true && tx.bankReferenceNum.length == 12
+            if ((TransactionDeduplicator.isGenericMerchant(tx.counterpartyName) || hasPhoneUtr) && !tx.tag.isNullOrBlank()) {
+                val parsed = SMSTransactionParser.parseSms(
+                    sender = "BANK",
+                    content = tx.tag,
+                    messageTimestampMs = tx.timestampMs
+                )
+                if (parsed != null) {
+                    val updated = tx.copy(
+                        title = if (!TransactionDeduplicator.isGenericMerchant(parsed.title)) parsed.title else tx.title,
+                        counterpartyName = if (!TransactionDeduplicator.isGenericMerchant(parsed.counterpartyName)) parsed.counterpartyName else tx.counterpartyName,
+                        bankReferenceNum = if (hasPhoneUtr) parsed.bankReferenceNum else tx.bankReferenceNum
+                    )
+                    transactionDao.update(updated.toEntity())
+                }
+            }
+        }
+
+        return toDelete.size
+    }
 }

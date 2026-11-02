@@ -176,4 +176,49 @@ class TransactionDeduplicatorTest {
         val differentAmountCandidate = candidate.copy(amountPaise = 49900L)
         assertFalse(TransactionDeduplicator.isDeletedTransaction(differentAmountCandidate, deleted))
     }
+
+    @Test
+    fun findDuplicate_matchesOct27NachAndAchDebitPair() {
+        val cal = java.util.Calendar.getInstance()
+        cal.set(2026, java.util.Calendar.OCTOBER, 27, 8, 13, 42)
+        val debitTime = cal.timeInMillis
+
+        cal.set(2026, java.util.Calendar.OCTOBER, 27, 8, 57, 27)
+        val nachTime = cal.timeInMillis
+
+        val achDebit = Transaction(
+            id = 26,
+            amountPaise = 3301500L,
+            type = TransactionType.EXPENSE,
+            direction = TransactionDirection.OUTGOING,
+            status = TransactionStatus.COMPLETED,
+            title = "Upi Payment",
+            counterpartyName = "Upi Payment",
+            categoryId = 1,
+            timestampMs = debitTime,
+            notes = "A/c ending **3721",
+            tag = "Debit INR 33015.00 Axis Bank A/c XX3721 27-10-26 08:13:42 ACH-DR-HDFC BANK LTD-48116 WhatsApp BAL to 917036165000"
+        )
+
+        val nachDebit = Transaction(
+            id = 25,
+            amountPaise = 3301500L,
+            type = TransactionType.EXPENSE,
+            direction = TransactionDirection.OUTGOING,
+            status = TransactionStatus.COMPLETED,
+            title = "HDFC Bank",
+            counterpartyName = "HDFC Bank",
+            categoryId = 1,
+            timestampMs = nachTime,
+            notes = "A/c ending **3721",
+            tag = "NACH debit towards HDFC BANK LTD for INR 33,015.00 with UMRN UTIB0000000009110862 has been successfully processed in A/c no. XX3721 today - Axis Bank"
+        )
+
+        val duplicate = TransactionDeduplicator.findDuplicate(nachDebit, listOf(achDebit))
+        assertNotNull("Should detect NACH debit and ACH debit as duplicates on the same day", duplicate)
+        assertEquals(26L, duplicate?.id)
+
+        // Verify shouldPreferCandidate prefers "HDFC Bank" over generic "Upi Payment"
+        assertTrue(TransactionDeduplicator.shouldPreferCandidate(nachDebit, achDebit))
+    }
 }

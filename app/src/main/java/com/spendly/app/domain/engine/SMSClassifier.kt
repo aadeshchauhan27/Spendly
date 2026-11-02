@@ -357,11 +357,15 @@ object SMSClassifier {
     }
 
     fun isBillReminderOrSettlement(lower: String): Boolean {
-        // Credit card bill payment acknowledgment (account settlement, not daily expense)
-        if ((lower.contains("towards your") || lower.contains("towards")) &&
-            (lower.contains("credit card") || lower.contains("card no.") || lower.contains("card xx") || lower.contains("card ending")) &&
-            (lower.contains("payment") || lower.contains("received") || lower.contains("thank you"))
-        ) {
+        // Credit card bill payment acknowledgment (account settlement, not new daily expense)
+        val isCcSettlement = (lower.contains("credit card") || lower.contains("card no.") || lower.contains("card xx") || lower.contains("card x")) &&
+                (lower.contains("payment") || lower.contains("received") || lower.contains("credited") || lower.contains("thank you")) &&
+                (lower.contains("payment of") || lower.contains("payment has been received") || lower.contains("payment received") ||
+                 lower.contains("credited towards") || lower.contains("received on your") || lower.contains("received for your") ||
+                 lower.contains("was credited to your") || lower.contains("via bbps") || lower.contains("towards your") ||
+                 lower.contains("credited/refunded")) &&
+                !lower.contains("cashback")
+        if (isCcSettlement) {
             return true
         }
 
@@ -394,7 +398,9 @@ object SMSClassifier {
             lower.contains("to be debited") || lower.contains("to be deducted") ||
             lower.contains("scheduled to be debited") || lower.contains("scheduled for debit") ||
             lower.contains("scheduled to debit") || lower.contains("scheduled debit") ||
-            lower.contains("scheduled for deduction")
+            lower.contains("scheduled for deduction") || lower.contains("we will debit") ||
+            lower.contains("will debit") || lower.contains("emi missed") ||
+            lower.contains("please maintain") || (lower.contains("maintain") && lower.contains("in your account"))
         ) {
             return true
         }
@@ -506,6 +512,12 @@ object SMSClassifier {
                 lower.contains("dishonoured") ||
                 lower.contains("dishonored") ||
                 lower.contains("returned unpaid") ||
+                lower.contains("has been returned") ||
+                lower.contains("returned today") ||
+                lower.contains("mandate returned") ||
+                lower.contains("autopay failed") ||
+                lower.contains("auto-pay failed") ||
+                lower.contains("autopay has failed") ||
                 lower.contains("rejected")
     }
 
@@ -676,6 +688,26 @@ object SMSClassifier {
     }
 
     private fun extractCounterparty(content: String, direction: TransactionDirection, isRefund: Boolean): String {
+        // 0. ACH / NACH Narration patterns (e.g. ACH-DR-HDFC BANK LTD-48116, NACH-DR-BAJAJ FINANCE)
+        val achMatcher = Pattern.compile("(?i)(?:ACH|NACH)-(?:DR|CR)-([A-Za-z0-9&.\\s]+?)(?:-\\d+|\\r?\\n|$)").matcher(content)
+        if (achMatcher.find()) {
+            val name = achMatcher.group(1)?.trim()
+            if (!name.isNullOrBlank()) {
+                val cleaned = cleanExtractedMerchant(name)
+                if (cleaned.isNotBlank() && cleaned.length >= 2) return cleaned
+            }
+        }
+
+        // 0b. NEFT / IMPS Info pattern (e.g. Info: NEFT/ IDFB6255M9598844/PRIYANKA NITIN GUPTA)
+        val neftMatcher = Pattern.compile("(?i)Info:\\s*(?:NEFT|IMPS)/[A-Za-z0-9]+/([A-Za-z0-9&.\\s]+?)(?:/|$)").matcher(content)
+        if (neftMatcher.find()) {
+            val name = neftMatcher.group(1)?.trim()
+            if (!name.isNullOrBlank()) {
+                val cleaned = cleanExtractedMerchant(name)
+                if (cleaned.isNotBlank() && cleaned.length >= 2) return cleaned
+            }
+        }
+
         // 1. Try @UPI_MERCHANT or @MERCHANT (common in YES Bank, IndusInd, e.g. "@UPI_ZOMATO MEDIA PRIVA")
         val atMatcher = Pattern.compile("(?i)@(?:UPI_)?([A-Za-z0-9&.\\s]+?)(?:\\s+\\d{1,2}[-/]|\\s+on|\\s+via|\\s+using|\\.|$)").matcher(content)
         if (atMatcher.find()) {
@@ -806,9 +838,27 @@ object SMSClassifier {
         if (matcher.find()) {
             return matcher.group(1)?.trim()
         }
+        val neftRefMatcher = Pattern.compile("(?i)(?:neft|imps)/\\s*([A-Za-z0-9]{10,22})").matcher(content)
+        if (neftRefMatcher.find()) {
+            return neftRefMatcher.group(1)?.trim()
+        }
         val standalone = STANDALONE_12_DIGIT_REGEX.matcher(content)
-        if (standalone.find()) {
-            return standalone.group(1)?.trim()
+        while (standalone.find()) {
+            val candidate = standalone.group(1)?.trim() ?: continue
+            val startIdx = standalone.start()
+            val prefix = if (startIdx >= 15) content.substring(startIdx - 15, startIdx).lowercase(Locale.ENGLISH) else content.substring(0, startIdx).lowercase(Locale.ENGLISH)
+            // Skip if preceded by phone contact words
+            if (prefix.contains("to ") || prefix.contains("call ") || prefix.contains("sms ") ||
+                prefix.contains("whatsapp") || prefix.contains("custid") || prefix.contains("bal to") ||
+                prefix.contains("block") || prefix.contains("dial") || prefix.contains("helpline")
+            ) {
+                continue
+            }
+            // Skip 12-digit numbers that look like Indian phone numbers with 91 country code (91-6/7/8/9...)
+            if (candidate.startsWith("91") && candidate.length == 12 && candidate[2] in listOf('6', '7', '8', '9')) {
+                continue
+            }
+            return candidate
         }
         return null
     }

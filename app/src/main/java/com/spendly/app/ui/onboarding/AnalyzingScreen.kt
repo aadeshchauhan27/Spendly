@@ -124,6 +124,7 @@ fun AnalyzingScreen(
                         errorCount = 0
                     )
                 }
+                repository.deduplicateDatabaseTransactions()
             } catch (_: Exception) {}
         }
 

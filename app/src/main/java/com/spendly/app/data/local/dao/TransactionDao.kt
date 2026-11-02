@@ -103,9 +103,22 @@ interface TransactionDao {
             OR raw_identifier LIKE '%failed%' 
             OR raw_identifier LIKE '%declined%' 
             OR raw_identifier LIKE '%autopay%'
+            OR tag LIKE '%has been returned%'
+            OR tag LIKE '%returned today%'
           )
     """)
     suspend fun markFailedTransactions(): Int
+
+    @Query("DELETE FROM transactions WHERE status = 'FAILED'")
+    suspend fun deleteFailedTransactions(): Int
+
+    @Query("""
+        DELETE FROM transactions 
+        WHERE (title LIKE '%bill payment system%' OR counterparty_name LIKE '%bill payment system%')
+          AND tag LIKE '%credit card%'
+          AND (tag LIKE '%payment of%' OR tag LIKE '%received on your%')
+    """)
+    suspend fun cleanupCcSettlementDuplicates(): Int
 
     @Query("""
         SELECT COUNT(*) FROM transactions 
