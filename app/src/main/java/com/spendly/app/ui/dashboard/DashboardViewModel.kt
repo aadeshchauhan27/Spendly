@@ -66,7 +66,14 @@ class DashboardViewModel(
             "365D", "1Y" -> 365 * 24 * 60 * 60 * 1000L
             else -> 7 * 24 * 60 * 60 * 1000L
         }
-        val startMs = now - durationMs
+        val calStart = java.util.Calendar.getInstance().apply {
+            timeInMillis = now - durationMs
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val startMs = calStart.timeInMillis
 
         combine(
             repository.getDashboardSummaryFlow(startMs, now),

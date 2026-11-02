@@ -8,6 +8,7 @@ import com.spendly.app.domain.model.TransactionStatus
 import com.spendly.app.domain.model.TransactionType
 import java.math.BigDecimal
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.regex.Pattern
@@ -186,7 +187,7 @@ object SMSClassifier {
         val utr = extractUtr(normalizedText)
         val upiVpa = extractUpiVpa(normalizedText)
         val accountEnding = extractAccountEnding(normalizedText)
-        val eventTimestampMs = extractDateFromText(normalizedText) ?: messageTimestampMs
+        val eventTimestampMs = extractDateFromText(normalizedText, messageTimestampMs)
         val paymentApp = detectPaymentApp(normalizedSender, normalizedText)
 
         // Determine Transaction Status
@@ -827,11 +828,21 @@ object SMSClassifier {
         }
     }
 
-    private fun extractDateFromText(content: String): Long? {
-        val datePatterns = listOf(
+    private fun extractDateFromText(content: String, messageTimestampMs: Long): Long {
+        if (messageTimestampMs <= 0L) {
+            return parseFallbackDate(content) ?: System.currentTimeMillis()
+        }
+
+        val dateTimePatterns = listOf(
             "dd-MM-yyyy HH:mm:ss",
             "dd/MM/yyyy HH:mm:ss",
             "dd-MMM-yy HH:mm:ss",
+            "dd-MMM-yyyy HH:mm:ss",
+            "dd/MM/yy HH:mm:ss",
+            "dd-MM-yy HH:mm:ss"
+        )
+
+        val dateOnlyPatterns = listOf(
             "dd-MMM-yyyy",
             "dd-MMM-yy",
             "dd/MM/yyyy",
@@ -842,15 +853,72 @@ object SMSClassifier {
 
         val dateMatcher = Pattern.compile("(?i)\\b(\\d{1,2}[-/](?:[a-z]{3}|\\d{2})[-/]\\d{2,4}(?:\\s+\\d{2}:\\d{2}:\\d{2})?)\\b").matcher(content)
         if (dateMatcher.find()) {
-            val dateStr = dateMatcher.group(1) ?: return null
+            val dateStr = dateMatcher.group(1) ?: return messageTimestampMs
             val now = System.currentTimeMillis()
-            for (pattern in datePatterns) {
+
+            // 1. Check patterns that have explicit time
+            for (pattern in dateTimePatterns) {
                 try {
                     val sdf = SimpleDateFormat(pattern, Locale.ENGLISH).apply { isLenient = false }
                     val parsed = sdf.parse(dateStr)
                     if (parsed != null && parsed.time <= now && parsed.time >= now - (365L * 24 * 60 * 60 * 1000L)) {
                         return parsed.time
                     }
+                } catch (_: Exception) {}
+            }
+
+            // 2. Check date-only patterns
+            for (pattern in dateOnlyPatterns) {
+                try {
+                    val sdf = SimpleDateFormat(pattern, Locale.ENGLISH).apply { isLenient = false }
+                    val parsed = sdf.parse(dateStr)
+                    if (parsed != null) {
+                        val msgCal = Calendar.getInstance().apply { timeInMillis = messageTimestampMs }
+                        val parsedCal = Calendar.getInstance().apply { timeInMillis = parsed.time }
+
+                        // If text date is on the same calendar day as the SMS receipt, keep the SMS exact time
+                        if (msgCal.get(Calendar.YEAR) == parsedCal.get(Calendar.YEAR) &&
+                            msgCal.get(Calendar.DAY_OF_YEAR) == parsedCal.get(Calendar.DAY_OF_YEAR)
+                        ) {
+                            return messageTimestampMs
+                        }
+
+                        // Different day: retain SMS hour, minute, second instead of artificial 00:00 midnight
+                        parsedCal.set(Calendar.HOUR_OF_DAY, msgCal.get(Calendar.HOUR_OF_DAY))
+                        parsedCal.set(Calendar.MINUTE, msgCal.get(Calendar.MINUTE))
+                        parsedCal.set(Calendar.SECOND, msgCal.get(Calendar.SECOND))
+                        parsedCal.set(Calendar.MILLISECOND, msgCal.get(Calendar.MILLISECOND))
+
+                        if (parsedCal.timeInMillis <= now && parsedCal.timeInMillis >= now - (365L * 24 * 60 * 60 * 1000L)) {
+                            return parsedCal.timeInMillis
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+        return messageTimestampMs
+    }
+
+    private fun parseFallbackDate(content: String): Long? {
+        val patterns = listOf(
+            "dd-MM-yyyy HH:mm:ss",
+            "dd/MM/yyyy HH:mm:ss",
+            "dd-MMM-yy HH:mm:ss",
+            "dd-MMM-yyyy",
+            "dd-MMM-yy",
+            "dd/MM/yyyy",
+            "dd-MM-yyyy",
+            "dd/MM/yy",
+            "dd-MM-yy"
+        )
+        val dateMatcher = Pattern.compile("(?i)\\b(\\d{1,2}[-/](?:[a-z]{3}|\\d{2})[-/]\\d{2,4}(?:\\s+\\d{2}:\\d{2}:\\d{2})?)\\b").matcher(content)
+        if (dateMatcher.find()) {
+            val dateStr = dateMatcher.group(1) ?: return null
+            for (p in patterns) {
+                try {
+                    val sdf = SimpleDateFormat(p, Locale.ENGLISH).apply { isLenient = false }
+                    val parsed = sdf.parse(dateStr)
+                    if (parsed != null) return parsed.time
                 } catch (_: Exception) {}
             }
         }

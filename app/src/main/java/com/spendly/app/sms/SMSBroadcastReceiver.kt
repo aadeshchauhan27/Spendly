@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.os.Build
 import android.provider.Telephony
 import android.util.Log
@@ -156,16 +157,26 @@ class SMSBroadcastReceiver : BroadcastReceiver() {
 
             val text = "${tx.paymentApp ?: "UPI"} • ${tx.categoryName} • Added to Spendly"
 
-            val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+            val largeIcon = try {
+                BitmapFactory.decodeResource(context.resources, R.drawable.spendly_splash_logo)
+            } catch (e: Exception) {
+                null
+            }
+
+            val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification_spendly)
+                .setColor(0xFF09142A.toInt())
                 .setContentTitle(title)
                 .setContentText(text)
                 .setAutoCancel(true)
                 .setContentIntent(pendingIntent)
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                .build()
 
-            notificationManager.notify(tx.id.toInt(), notification)
+            if (largeIcon != null) {
+                builder.setLargeIcon(largeIcon)
+            }
+
+            notificationManager.notify(tx.id.toInt(), builder.build())
         } catch (e: Exception) {
             Log.e(TAG, "Failed to show notification", e)
         }

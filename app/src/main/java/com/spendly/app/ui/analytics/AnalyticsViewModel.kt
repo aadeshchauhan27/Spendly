@@ -211,7 +211,14 @@ class AnalyticsViewModel(
             else -> 30
         }
         val durationMs = days * oneDayMs
-        val startMs = now - durationMs
+        val calStart = Calendar.getInstance().apply {
+            timeInMillis = now - durationMs
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val startMs = calStart.timeInMillis
         val prevStartMs = startMs - durationMs
         val prevEndMs = startMs
         return PeriodWindow(startMs, now, prevStartMs, prevEndMs, days)
@@ -223,35 +230,64 @@ class AnalyticsViewModel(
         endMs: Long,
         days: Int
     ): Pair<List<TrendPoint>, List<String>> {
-        val bucketsCount = minOf(10, maxOf(6, days))
-        val bucketDuration = (endMs - startMs) / bucketsCount.coerceAtLeast(1)
-        val trendPoints = mutableListOf<TrendPoint>()
+        val dateFormat = SimpleDateFormat("dd MMM", Locale("en", "IN"))
+        val fullDateFormat = SimpleDateFormat("dd MMM yyyy", Locale("en", "IN"))
+        val dayKeyFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+
+        val calStart = Calendar.getInstance().apply {
+            timeInMillis = startMs
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        val calEnd = Calendar.getInstance().apply {
+            timeInMillis = endMs
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59)
+            set(Calendar.MILLISECOND, 999)
+        }
+
+        val diffDays = (((calEnd.timeInMillis - calStart.timeInMillis) / 86400000L) + 1).toInt().coerceIn(1, 365)
+
+        val dailySums = mutableMapOf<String, Float>()
+        expenses.forEach { tx ->
+            val dayKey = dayKeyFormat.format(Date(tx.timestampMs))
+            val cur = dailySums.getOrDefault(dayKey, 0f)
+            dailySums[dayKey] = cur + (tx.amountPaise / 100f)
+        }
+
+        val cursorCal = Calendar.getInstance().apply { timeInMillis = calStart.timeInMillis }
+        val points = mutableListOf<TrendPoint>()
         val dates = mutableListOf<String>()
-        val sdf = SimpleDateFormat("dd MMM", Locale("en", "IN"))
-        val fullSdf = SimpleDateFormat("dd MMM yyyy", Locale("en", "IN"))
 
-        for (i in 0 until bucketsCount) {
-            val bStart = startMs + (i * bucketDuration)
-            val bEnd = bStart + bucketDuration
-            val midTime = bStart + (bucketDuration / 2)
-            val bucketSpendPaise = expenses.filter { it.timestampMs in bStart..bEnd }
-                .sumOf { it.amountPaise }
-            val amountRupees = (bucketSpendPaise / 100).toFloat()
-            val dateLabel = sdf.format(Date(midTime))
-            val fullDate = fullSdf.format(Date(midTime))
+        for (i in 0 until diffDays) {
+            val dayDate = cursorCal.time
+            val dayKey = dayKeyFormat.format(dayDate)
+            val dayStartMs = cursorCal.timeInMillis
+            val amount = dailySums[dayKey] ?: 0f
+            val dateLabel = dateFormat.format(dayDate)
 
-            trendPoints.add(
+            points.add(
                 TrendPoint(
-                    amountRupees = amountRupees,
+                    amountRupees = amount,
                     dateLabel = dateLabel,
-                    fullDate = fullDate,
-                    timestampMs = midTime
+                    fullDate = fullDateFormat.format(dayDate),
+                    timestampMs = dayStartMs
                 )
             )
             dates.add(dateLabel)
+            cursorCal.add(Calendar.DAY_OF_YEAR, 1)
         }
 
-        return trendPoints to dates
+        val resultPoints = if (points.size >= 2) points else {
+            val p = points.firstOrNull() ?: TrendPoint(0f, dateFormat.format(Date(endMs)), fullDateFormat.format(Date(endMs)), endMs)
+            listOf(p, p)
+        }
+
+        return resultPoints to dates
     }
 
     class Factory(private val repository: SpendlyRepository) : ViewModelProvider.Factory {

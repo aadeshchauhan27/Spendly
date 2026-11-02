@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.spendly.app.core.theme.ElectricLime
 import com.spendly.app.core.theme.SpendlyTheme
 import com.spendly.app.domain.model.TrendPoint
@@ -98,22 +99,6 @@ fun SpendlyTrendLineChart(
                 modifier = Modifier
                     .width(chartWidth)
                     .height(height)
-                    .pointerInput(points) {
-                        detectTapGestures(
-                            onTap = { offset ->
-                                val padding = with(density) { 16.dp.toPx() }
-                                val width = size.width.toFloat()
-                                val stepX = (width - padding * 2) / (points.size - 1).coerceAtLeast(1)
-                                val tappedIdx = ((offset.x - padding + stepX / 2f) / stepX)
-                                    .toInt()
-                                    .coerceIn(0, points.size - 1)
-                                if (selectedIndex != tappedIdx) {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                }
-                                selectedIndex = if (selectedIndex == tappedIdx) null else tappedIdx
-                            }
-                        )
-                    }
             ) {
                 val widthPx = with(density) { chartWidth.toPx() }
                 val heightPx = with(density) { containerMaxHeight.toPx() }
@@ -121,14 +106,40 @@ fun SpendlyTrendLineChart(
                 val graphHeightPx = heightPx - paddingPx * 2
                 val stepXPx = (widthPx - paddingPx * 2) / (points.size - 1).coerceAtLeast(1)
 
-        val calculatedPoints = points.mapIndexed { index, pt ->
-            val normY = (pt.amountRupees - minVal) / (maxVal - minVal)
-            val x = paddingPx + index * stepXPx
-            val y = heightPx - paddingPx - (normY * graphHeightPx)
-            Offset(x, y)
-        }
+                val calculatedPoints = points.mapIndexed { index, pt ->
+                    val normY = (pt.amountRupees - minVal) / (maxVal - minVal)
+                    val x = paddingPx + index * stepXPx
+                    val y = heightPx - paddingPx - (normY * graphHeightPx)
+                    Offset(x, y)
+                }
 
-        Canvas(modifier = Modifier.fillMaxSize()) {
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(points) {
+                            detectTapGestures(
+                                onTap = { offset ->
+                                    val padding = with(density) { 16.dp.toPx() }
+                                    val width = size.width.toFloat()
+                                    val stepX = (width - padding * 2) / (points.size - 1).coerceAtLeast(1)
+                                    val tappedIdx = ((offset.x - padding + stepX / 2f) / stepX)
+                                        .toInt()
+                                        .coerceIn(0, points.size - 1)
+                                    if (selectedIndex == tappedIdx) {
+                                        if (onPointClick != null) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            onPointClick(points[tappedIdx])
+                                        } else {
+                                            selectedIndex = null
+                                        }
+                                    } else {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        selectedIndex = tappedIdx
+                                    }
+                                }
+                            )
+                        }
+                ) {
             val canvasHeight = size.height
 
             // Create smooth cubic bezier path
@@ -229,14 +240,15 @@ fun SpendlyTrendLineChart(
 
             Box(
                 modifier = Modifier
+                    .zIndex(10f)
                     .offset(x = tooltipX, y = tooltipY)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (colors.isDark) Color(0xFF09142A) else Color(0xFF1E293B))
-                    .border(1.dp, lineColor.copy(alpha = 0.85f), RoundedCornerShape(10.dp))
                     .clickable(enabled = onPointClick != null) {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onPointClick?.invoke(selectedPoint)
                     }
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (colors.isDark) Color(0xFF09142A) else Color(0xFF1E293B))
+                    .border(1.dp, lineColor.copy(alpha = 0.85f), RoundedCornerShape(10.dp))
                     .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {

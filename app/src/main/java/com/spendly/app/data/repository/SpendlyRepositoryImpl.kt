@@ -34,6 +34,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class SpendlyRepositoryImpl(
     private val database: SpendlyDatabase
@@ -325,6 +328,80 @@ class SpendlyRepositoryImpl(
         transactionDao.sanitizeSpamTransactions()
         transactionDao.cleanupMiscalibratedIdfcLimit()
         transactionDao.markFailedTransactions()
+        cleanupDuplicateTransactions()
+    }
+
+    private suspend fun cleanupDuplicateTransactions() {
+        val allEntities = transactionDao.getAllTransactionsList()
+        if (allEntities.size < 2) return
+
+        val domainList = allEntities.map { it.toDomain() }
+        val toDelete = mutableSetOf<Long>()
+        val toUpdate = mutableListOf<TransactionEntity>()
+
+        val grouped = domainList.groupBy { it.amountPaise to it.direction }
+
+        for ((_, group) in grouped) {
+            if (group.size < 2) continue
+
+            val dayGroups = mutableMapOf<String, MutableList<Transaction>>()
+            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            for (tx in group) {
+                val key = sdf.format(Date(tx.timestampMs))
+                dayGroups.getOrPut(key) { mutableListOf() }.add(tx)
+            }
+
+            for ((_, dayTxs) in dayGroups) {
+                if (dayTxs.size < 2) continue
+
+                for (i in 0 until dayTxs.size) {
+                    val tx1 = dayTxs[i]
+                    if (tx1.id in toDelete) continue
+
+                    for (j in i + 1 until dayTxs.size) {
+                        val tx2 = dayTxs[j]
+                        if (tx2.id in toDelete) continue
+
+                        val merchantMatch = MerchantNormalizer.normalize(tx1.counterpartyName).equals(
+                            MerchantNormalizer.normalize(tx2.counterpartyName), ignoreCase = true
+                        ) || (tx1.title.isNotBlank() && tx1.title.equals(tx2.title, ignoreCase = true)) ||
+                        (tx1.notes != null && tx2.notes != null && tx1.notes.contains("ending") && tx1.notes == tx2.notes)
+
+                        val timeDiff = Math.abs(tx1.timestampMs - tx2.timestampMs)
+                        val isMid1 = TransactionDeduplicator.isMidnight(tx1.timestampMs)
+                        val isMid2 = TransactionDeduplicator.isMidnight(tx2.timestampMs)
+
+                        val isDuplicate = merchantMatch && (timeDiff <= 15 * 60 * 1000L || isMid1 || isMid2)
+
+                        if (isDuplicate) {
+                            val candidateKeep = if (TransactionDeduplicator.shouldPreferCandidate(tx2, tx1)) tx2 else tx1
+                            val dropTx = if (candidateKeep.id == tx1.id) tx2 else tx1
+
+                            var finalKeep = candidateKeep
+                            if (TransactionDeduplicator.isMidnight(finalKeep.timestampMs) && !TransactionDeduplicator.isMidnight(dropTx.timestampMs)) {
+                                finalKeep = finalKeep.copy(timestampMs = dropTx.timestampMs)
+                            }
+                            if (finalKeep.bankReferenceNum.isNullOrBlank() && !dropTx.bankReferenceNum.isNullOrBlank()) {
+                                finalKeep = finalKeep.copy(bankReferenceNum = dropTx.bankReferenceNum)
+                            }
+
+                            if (finalKeep != candidateKeep) {
+                                toUpdate.add(finalKeep.toEntity())
+                            }
+
+                            toDelete.add(dropTx.id)
+                        }
+                    }
+                }
+            }
+        }
+
+        for (id in toDelete) {
+            transactionDao.deleteById(id)
+        }
+        for (entity in toUpdate) {
+            transactionDao.update(entity)
+        }
     }
 
     override suspend fun batchInsertTransactions(

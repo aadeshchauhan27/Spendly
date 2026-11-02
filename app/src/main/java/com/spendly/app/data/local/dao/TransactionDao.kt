@@ -15,6 +15,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions ORDER BY timestamp_ms DESC")
     fun getAllTransactionsFlow(): Flow<List<TransactionEntity>>
 
+    @Query("SELECT * FROM transactions ORDER BY timestamp_ms DESC")
+    suspend fun getAllTransactionsList(): List<TransactionEntity>
+
     @Query("SELECT * FROM transactions WHERE timestamp_ms BETWEEN :startMs AND :endMs ORDER BY timestamp_ms DESC")
     fun getTransactionsBetweenFlow(startMs: Long, endMs: Long): Flow<List<TransactionEntity>>
 

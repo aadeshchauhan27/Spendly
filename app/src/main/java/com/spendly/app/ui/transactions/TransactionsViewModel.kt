@@ -116,6 +116,8 @@ class TransactionsViewModel(
     }
 
     fun filterByDay(timestampMs: Long) {
+        selectedCategoryFlow.value = "All"
+        searchQueryFlow.value = ""
         val cal = Calendar.getInstance().apply {
             timeInMillis = timestampMs
             set(Calendar.HOUR_OF_DAY, 0)

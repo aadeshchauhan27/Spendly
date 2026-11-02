@@ -3,10 +3,25 @@ package com.spendly.app.domain.engine
 import com.spendly.app.data.local.entity.DeletedTransactionEntity
 import com.spendly.app.domain.model.Transaction
 import com.spendly.app.domain.model.TransactionStatus
+import java.util.Calendar
 
 object TransactionDeduplicator {
 
     private const val FUZZY_TIME_WINDOW_MS = 15 * 60 * 1000L // 15 minutes window
+
+    fun isSameCalendarDay(t1: Long, t2: Long): Boolean {
+        val c1 = Calendar.getInstance().apply { timeInMillis = t1 }
+        val c2 = Calendar.getInstance().apply { timeInMillis = t2 }
+        return c1.get(Calendar.YEAR) == c2.get(Calendar.YEAR) &&
+               c1.get(Calendar.DAY_OF_YEAR) == c2.get(Calendar.DAY_OF_YEAR)
+    }
+
+    fun isMidnight(timestampMs: Long): Boolean {
+        val c = Calendar.getInstance().apply { timeInMillis = timestampMs }
+        return c.get(Calendar.HOUR_OF_DAY) == 0 &&
+               c.get(Calendar.MINUTE) == 0 &&
+               c.get(Calendar.SECOND) == 0
+    }
 
     /**
      * Checks if a new transaction is a duplicate of any existing transactions.
@@ -33,18 +48,28 @@ object TransactionDeduplicator {
         }
 
         // 3. Conservative fuzzy match:
-        // Same amount in paise + same direction + normalized counterparty match + timestamp within 15 minutes
+        // Same amount in paise + same direction + normalized counterparty match
+        // Matches if within 15 minutes OR if on the same calendar day where at least one has midnight timestamp
         val candidateMerchant = MerchantNormalizer.normalize(candidate.counterpartyName)
 
         return existingTransactions.find { existing ->
             val sameAmount = existing.amountPaise == candidate.amountPaise
             val sameDirection = existing.direction == candidate.direction
+            if (!sameAmount || !sameDirection) return@find false
+
             val timeDiff = Math.abs(existing.timestampMs - candidate.timestampMs)
             val withinTimeWindow = timeDiff <= FUZZY_TIME_WINDOW_MS
-            val existingMerchant = MerchantNormalizer.normalize(existing.counterpartyName)
-            val sameMerchant = candidateMerchant.equals(existingMerchant, ignoreCase = true)
+            val sameDay = isSameCalendarDay(existing.timestampMs, candidate.timestampMs)
 
-            sameAmount && sameDirection && withinTimeWindow && sameMerchant
+            val existingMerchant = MerchantNormalizer.normalize(existing.counterpartyName)
+            val sameMerchant = candidateMerchant.equals(existingMerchant, ignoreCase = true) ||
+                    (candidate.notes != null && existing.notes != null &&
+                     candidate.notes.contains("ending") && existing.notes.contains("ending") &&
+                     candidate.notes == existing.notes)
+
+            val isTimeMatched = withinTimeWindow || (sameDay && (isMidnight(existing.timestampMs) || isMidnight(candidate.timestampMs)))
+
+            sameMerchant && isTimeMatched
         }
     }
 
@@ -112,6 +137,10 @@ object TransactionDeduplicator {
         if (!candidate.notes.isNullOrBlank() && existing.notes.isNullOrBlank()) {
             return true
         }
+        // 4. Real timestamp beats artificial 00:00:00 midnight timestamp
+        if (!isMidnight(candidate.timestampMs) && isMidnight(existing.timestampMs)) {
+            return true
+        }
         return false
     }
 
@@ -164,12 +193,21 @@ object TransactionDeduplicator {
 
             return sameAmountList.find { existing ->
                 val sameDirection = existing.direction == candidate.direction
+                if (!sameDirection) return@find false
+
                 val timeDiff = Math.abs(existing.timestampMs - candidate.timestampMs)
                 val withinTimeWindow = timeDiff <= FUZZY_TIME_WINDOW_MS
-                val existingMerchant = MerchantNormalizer.normalize(existing.counterpartyName)
-                val sameMerchant = candidateMerchant.equals(existingMerchant, ignoreCase = true)
+                val sameDay = isSameCalendarDay(existing.timestampMs, candidate.timestampMs)
 
-                sameDirection && withinTimeWindow && sameMerchant
+                val existingMerchant = MerchantNormalizer.normalize(existing.counterpartyName)
+                val sameMerchant = candidateMerchant.equals(existingMerchant, ignoreCase = true) ||
+                        (candidate.notes != null && existing.notes != null &&
+                         candidate.notes.contains("ending") && existing.notes.contains("ending") &&
+                         candidate.notes == existing.notes)
+
+                val isTimeMatched = withinTimeWindow || (sameDay && (isMidnight(existing.timestampMs) || isMidnight(candidate.timestampMs)))
+
+                sameMerchant && isTimeMatched
             }
         }
     }
