@@ -168,6 +168,25 @@ fun SpendlyDateRangeDialog(
                             }
                         )
 
+                        // This Month
+                        SpendlyChip(
+                            text = "This Month",
+                            selected = activeShortcut == "This Month",
+                            onClick = {
+                                activeShortcut = "This Month"
+                                val cal = Calendar.getInstance().apply {
+                                    set(Calendar.DAY_OF_MONTH, 1)
+                                    set(Calendar.HOUR_OF_DAY, 0)
+                                    set(Calendar.MINUTE, 0)
+                                    set(Calendar.SECOND, 0)
+                                    set(Calendar.MILLISECOND, 0)
+                                }
+                                val start = cal.timeInMillis
+                                val now = System.currentTimeMillis()
+                                dateRangePickerState.setSelection(start, now)
+                            }
+                        )
+
                         // This Year
                         SpendlyChip(
                             text = "This Year",

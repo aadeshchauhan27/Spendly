@@ -23,6 +23,41 @@ class SpendlyAuthManager(
     private val userPreferences: UserPreferences
 ) {
 
+    companion object {
+        fun extractFirstName(raw: String): String {
+            if (raw.isBlank()) return "Aadesh"
+            // 1. If it's a full name with spaces like "Aadesh Chauhan", take the first word
+            if (!raw.contains("@") && raw.contains(" ")) {
+                val firstWord = raw.split(" ").firstOrNull { it.isNotBlank() } ?: raw
+                return firstWord.takeWhile { it.isLetter() }.lowercase().replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+            }
+
+            // 2. Email format, e.g. "aadeshchauhan27@gmail.com", "aadesh.chauhan@gmail.com", "aadesh_27@gmail.com"
+            val prefix = raw.substringBefore("@")
+
+            // Split by non-alphabetic / delimiter characters (., _, -, +, numbers)
+            val parts = prefix.split(Regex("[._\\-\\+\\d]+")).filter { it.isNotBlank() }
+            val firstPart = parts.firstOrNull() ?: prefix.filter { it.isLetter() }
+
+            // Check known surnames attached directly without delimiter
+            val commonSurnames = listOf(
+                "chauhan", "kumar", "singh", "sharma", "patel", "verma", "gupta",
+                "yadav", "mishra", "jain", "tiwari", "reddy", "rao", "nair",
+                "mehta", "agarwal", "bose", "sen", "das", "roy", "joshi", "shukla"
+            )
+            for (surname in commonSurnames) {
+                if (firstPart.length > surname.length + 2 && firstPart.lowercase().endsWith(surname)) {
+                    val clean = firstPart.substring(0, firstPart.length - surname.length)
+                    return clean.lowercase().replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+                }
+            }
+
+            val lettersOnly = firstPart.takeWhile { it.isLetter() }
+            val candidate = if (lettersOnly.isNotBlank()) lettersOnly else firstPart
+            return candidate.lowercase().replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        }
+    }
+
     private val isFirebaseAvailable: Boolean
         get() = try {
             FirebaseApp.getApps(context).isNotEmpty()
@@ -52,16 +87,7 @@ class SpendlyAuthManager(
         val accountName = intent.getStringExtra(AccountManager.KEY_ACCOUNT_NAME)
         if (!accountName.isNullOrBlank()) {
             val email = accountName.trim()
-            val cleanName = email.substringBefore("@")
-                .replace(".", " ")
-                .replace("_", " ")
-                .replace("-", " ")
-                .split(" ")
-                .filter { it.isNotBlank() }
-                .joinToString(" ") { part ->
-                    part.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
-                }
-                .ifBlank { "Google User" }
+            val firstName = extractFirstName(email)
 
             // Ensure Firebase Auth session exists for Firestore security rules
             if (isFirebaseAvailable) {
@@ -73,8 +99,9 @@ class SpendlyAuthManager(
                 } catch (_: Exception) {}
             }
 
-            userPreferences.setGoogleAccount(email, cleanName, null)
-            return Result.success(GoogleAccountInfo(email, cleanName))
+            userPreferences.setGoogleAccount(email, firstName, null)
+            userPreferences.updateProfile(firstName, email)
+            return Result.success(GoogleAccountInfo(email, firstName))
         }
 
         // 2. GoogleSignInAccount fallback
@@ -82,7 +109,8 @@ class SpendlyAuthManager(
             val task = GoogleSignIn.getSignedInAccountFromIntent(intent)
             val account: GoogleSignInAccount = task.getResult(ApiException::class.java)
             val email = account.email ?: "user@gmail.com"
-            val name = account.displayName ?: (account.givenName ?: "Google User")
+            val rawName = account.givenName ?: (account.displayName ?: "Google User")
+            val firstName = extractFirstName(rawName)
             val photoUrl = account.photoUrl?.toString()
             val idToken = account.idToken
 
@@ -93,8 +121,9 @@ class SpendlyAuthManager(
                 } catch (_: Exception) {}
             }
 
-            userPreferences.setGoogleAccount(email, name, photoUrl)
-            return Result.success(GoogleAccountInfo(email, name, photoUrl))
+            userPreferences.setGoogleAccount(email, firstName, photoUrl)
+            userPreferences.updateProfile(firstName, email)
+            return Result.success(GoogleAccountInfo(email, firstName, photoUrl))
         } catch (_: Exception) {}
 
         return Result.failure(Exception("Could not retrieve Google account"))

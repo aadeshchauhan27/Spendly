@@ -440,7 +440,59 @@ fun TransactionsScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Sort Order Row: Date | Largest | Smallest
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Sort by",
+                            style = SpendlyTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                            color = colors.textMuted
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            val sortOrders = listOf(
+                                TransactionSortOrder.DATE to "Date",
+                                TransactionSortOrder.LARGEST to "Largest",
+                                TransactionSortOrder.SMALLEST to "Smallest"
+                            )
+                            sortOrders.forEach { (order, label) ->
+                                val isSelected = state.sortOrder == order
+                                val bg = if (isSelected) (if (colors.isDark) ElectricLime else Color(0xFF09142A)) else colors.card
+                                val contentColor = if (isSelected) (if (colors.isDark) DarkNavyBackground else Color.White) else colors.textSecondary
+                                val borderCol = if (isSelected) (if (colors.isDark) ElectricLime else Color(0xFF09142A)) else colors.border
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(PillShape)
+                                        .background(bg)
+                                        .border(1.dp, borderCol, PillShape)
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            viewModel.setSortOrder(order)
+                                        }
+                                        .padding(horizontal = 11.dp, vertical = 5.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        style = SpendlyTheme.typography.labelSmall.copy(
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            fontSize = 11.sp
+                                        ),
+                                        color = contentColor
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     if (state.groupedTransactions.isEmpty()) {
                         SpendlyEmptyState(

@@ -121,10 +121,11 @@ fun DashboardScreen(
             .fillMaxSize()
             .background(colors.background)
     ) {
-        val userName = when (val state = uiState) {
+        val rawUserName = when (val state = uiState) {
             is DashboardUiState.Success -> state.userName
             else -> "Aadesh"
         }
+        val userName = com.spendly.app.core.auth.SpendlyAuthManager.extractFirstName(rawUserName)
 
         // App Header
         SpendlyHeader(

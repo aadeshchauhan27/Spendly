@@ -88,6 +88,7 @@ import com.spendly.app.ui.import_export.ImportPreviewBottomSheet
 import com.spendly.app.ui.import_export.ImportViewModel
 import com.spendly.app.ui.sms.SmsSyncBottomSheet
 import com.spendly.app.ui.sms.SmsSyncViewModel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -117,6 +118,10 @@ fun SettingsScreen(
     var showSmsSheet by remember { mutableStateOf(false) }
     var showHistoryDialog by remember { mutableStateOf(false) }
     var showRestoreConfirmDialog by remember { mutableStateOf(false) }
+    var showNotificationsDialog by remember { mutableStateOf(false) }
+
+    val isDailyNotifEnabled by userPreferences.dailyNotificationEnabledFlow.collectAsState(initial = true)
+    val isWeeklyNotifEnabled by userPreferences.weeklyNotificationEnabledFlow.collectAsState(initial = true)
 
     val importHistory by importViewModel.importHistory.collectAsState()
     val googleEmail by userPreferences.googleAccountEmailFlow.collectAsState(initial = null)
@@ -437,7 +442,8 @@ fun SettingsScreen(
                         SettingsOptionRow(
                             icon = Icons.Default.Notifications,
                             title = "Notifications & Alerts",
-                            onClick = {}
+                            value = if (isDailyNotifEnabled || isWeeklyNotifEnabled) "On" else "Off",
+                            onClick = { showNotificationsDialog = true }
                         )
                         HorizontalDivider(color = colors.border.copy(alpha = 0.5f), thickness = 0.5.dp)
 
@@ -759,6 +765,62 @@ fun SettingsScreen(
             onDismissRequest = { showSmsSheet = false }
         )
     }
+
+    // Notifications & Alerts Dialog
+    if (showNotificationsDialog) {
+        NotificationsAlertsDialog(
+            isDailyEnabled = isDailyNotifEnabled,
+            isWeeklyEnabled = isWeeklyNotifEnabled,
+            onDailyToggle = { enabled ->
+                coroutineScope.launch {
+                    userPreferences.setDailyNotificationEnabled(enabled)
+                }
+            },
+            onWeeklyToggle = { enabled ->
+                coroutineScope.launch {
+                    userPreferences.setWeeklyNotificationEnabled(enabled)
+                }
+            },
+            onSendTestDailyNotification = {
+                coroutineScope.launch {
+                    val all = repository.getAllTransactionsFlow().first()
+                    val todayCal = java.util.Calendar.getInstance()
+                    val txCal = java.util.Calendar.getInstance()
+                    val todayTx = all.filter {
+                        txCal.timeInMillis = it.timestampMs
+                        it.type == com.spendly.app.domain.model.TransactionType.EXPENSE &&
+                        todayCal.get(java.util.Calendar.YEAR) == txCal.get(java.util.Calendar.YEAR) &&
+                        todayCal.get(java.util.Calendar.DAY_OF_YEAR) == txCal.get(java.util.Calendar.DAY_OF_YEAR)
+                    }
+                    val spentPaise = todayTx.sumOf { it.amountPaise }
+                    com.spendly.app.core.notification.SpendlyNotificationManager.showDailySpendingAlert(
+                        context = context,
+                        spentPaise = spentPaise,
+                        transactionCount = todayTx.size
+                    )
+                    Toast.makeText(context, "Daily spending alert sent to notification drawer!", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onSendTestWeeklyNotification = {
+                coroutineScope.launch {
+                    val all = repository.getAllTransactionsFlow().first()
+                    val now = System.currentTimeMillis()
+                    val weekAgo = now - 7 * 24 * 60 * 60 * 1000L
+                    val weekTx = all.filter {
+                        it.type == com.spendly.app.domain.model.TransactionType.EXPENSE && it.timestampMs in weekAgo..now
+                    }
+                    val spentPaise = weekTx.sumOf { it.amountPaise }
+                    com.spendly.app.core.notification.SpendlyNotificationManager.showWeeklySpendingAlert(
+                        context = context,
+                        spentPaise = spentPaise,
+                        transactionCount = weekTx.size
+                    )
+                    Toast.makeText(context, "Weekly summary sent to notification drawer!", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onDismissRequest = { showNotificationsDialog = false }
+        )
+    }
 }
 
 @Composable
@@ -852,3 +914,129 @@ private fun SettingsDialogActionRow(
         }
     }
 }
+
+@Composable
+private fun NotificationsAlertsDialog(
+    isDailyEnabled: Boolean,
+    isWeeklyEnabled: Boolean,
+    onDailyToggle: (Boolean) -> Unit,
+    onWeeklyToggle: (Boolean) -> Unit,
+    onSendTestDailyNotification: () -> Unit,
+    onSendTestWeeklyNotification: () -> Unit,
+    onDismissRequest: () -> Unit
+) {
+    val colors = SpendlyTheme.colors
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        containerColor = colors.card,
+        title = {
+            Text(
+                text = "Spending Alerts & Summaries",
+                style = SpendlyTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = colors.textPrimary
+            )
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Stay in control with automatic daily and weekly push notifications.",
+                    style = SpendlyTheme.typography.bodySmall,
+                    color = colors.textMuted
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Daily Alert Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Daily Spending Summary",
+                            style = SpendlyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = colors.textPrimary
+                        )
+                        Text(
+                            text = "Alert with total spent today",
+                            style = SpendlyTheme.typography.bodySmall,
+                            color = colors.textMuted
+                        )
+                    }
+                    Switch(
+                        checked = isDailyEnabled,
+                        onCheckedChange = onDailyToggle,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = colors.background,
+                            checkedTrackColor = if (colors.isDark) ElectricLime else Color(0xFF0284C7)
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Weekly Alert Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Weekly Spending Summary",
+                            style = SpendlyTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = colors.textPrimary
+                        )
+                        Text(
+                            text = "Recap of last 7 days spending",
+                            style = SpendlyTheme.typography.bodySmall,
+                            color = colors.textMuted
+                        )
+                    }
+                    Switch(
+                        checked = isWeeklyEnabled,
+                        onCheckedChange = onWeeklyToggle,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = colors.background,
+                            checkedTrackColor = if (colors.isDark) ElectricLime else Color(0xFF0284C7)
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+                HorizontalDivider(color = colors.border, thickness = 0.5.dp)
+                Spacer(modifier = Modifier.height(14.dp))
+
+                SpendlyButton(
+                    text = "Send Test Daily Alert",
+                    onClick = onSendTestDailyNotification,
+                    style = SpendlyButtonStyle.PRIMARY_LIME,
+                    modifier = Modifier.fillMaxWidth(),
+                    icon = {
+                        Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                SpendlyButton(
+                    text = "Send Test Weekly Alert",
+                    onClick = onSendTestWeeklyNotification,
+                    style = SpendlyButtonStyle.OUTLINE,
+                    modifier = Modifier.fillMaxWidth(),
+                    icon = {
+                        Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismissRequest) {
+                Text("Done", color = if (colors.isDark) ElectricLime else Color(0xFF0284C7), fontWeight = FontWeight.Bold)
+            }
+        }
+    )
+}
+

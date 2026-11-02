@@ -150,10 +150,7 @@ fun SpendlyNavGraph(
                 val permissionLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestMultiplePermissions()
                 ) {
-                    coroutineScope.launch {
-                        userPreferences.setOnboardingCompleted(true)
-                    }
-                    navController.navigate(Screen.Dashboard.route) {
+                    navController.navigate(Screen.Analyzing.route) {
                         popUpTo(Screen.Permissions.route) { inclusive = true }
                     }
                 }
@@ -170,11 +167,22 @@ fun SpendlyNavGraph(
                         permissionLauncher.launch(perms)
                     },
                     onSkipClick = {
+                        navController.navigate(Screen.Analyzing.route) {
+                            popUpTo(Screen.Permissions.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
+
+            composable(Screen.Analyzing.route) {
+                com.spendly.app.ui.onboarding.AnalyzingScreen(
+                    repository = repository,
+                    onAnalysisComplete = {
                         coroutineScope.launch {
                             userPreferences.setOnboardingCompleted(true)
                         }
                         navController.navigate(Screen.Dashboard.route) {
-                            popUpTo(Screen.Permissions.route) { inclusive = true }
+                            popUpTo(Screen.Analyzing.route) { inclusive = true }
                         }
                     }
                 )

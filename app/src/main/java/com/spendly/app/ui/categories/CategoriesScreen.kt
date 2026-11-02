@@ -22,6 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -64,6 +66,7 @@ fun CategoriesScreen(
     val haptic = LocalHapticFeedback.current
     val uiState by viewModel.uiState.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
+    var showDateRangePicker by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -191,7 +194,70 @@ fun CategoriesScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Date Range Filter Bar
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = if (state.isSpending) "Spending Breakdown" else "Income Breakdown",
+                        style = SpendlyTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = colors.textPrimary
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .clip(PillShape)
+                            .background(colors.card)
+                            .border(
+                                1.dp,
+                                if (state.dateRange != null) (if (colors.isDark) ElectricLime else Color(0xFF0284C7)) else colors.border,
+                                PillShape
+                            )
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                showDateRangePicker = true
+                            }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.DateRange,
+                                contentDescription = "Date Filter",
+                                tint = if (state.dateRange != null) (if (colors.isDark) ElectricLime else Color(0xFF0284C7)) else colors.textSecondary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = state.dateRange?.label ?: "All Time",
+                                style = SpendlyTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                color = if (state.dateRange != null) (if (colors.isDark) ElectricLime else Color(0xFF0284C7)) else colors.textSecondary
+                            )
+                            if (state.dateRange != null) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Clear",
+                                    tint = colors.textMuted,
+                                    modifier = Modifier
+                                        .size(13.dp)
+                                        .clickable {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            viewModel.clearDateRange()
+                                        }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
 
                 if (state.isEmpty || state.categoriesList.isEmpty()) {
                     SpendlyEmptyState(
@@ -306,6 +372,21 @@ fun CategoriesScreen(
                     iconName = iconName
                 )
                 showAddDialog = false
+            }
+        )
+    }
+
+    if (showDateRangePicker) {
+        val stateSuccess = uiState as? CategoriesUiState.Success
+        com.spendly.app.core.components.SpendlyDateRangeDialog(
+            initialStartDateMs = stateSuccess?.dateRange?.startMs,
+            initialEndDateMs = stateSuccess?.dateRange?.endMs,
+            onDismissRequest = { showDateRangePicker = false },
+            onDateRangeSelected = { startMs, endMs ->
+                viewModel.setDateRange(startMs, endMs)
+            },
+            onClearDateRange = {
+                viewModel.clearDateRange()
             }
         )
     }

@@ -25,6 +25,8 @@ class UserPreferences(private val context: Context) {
         private val KEY_GOOGLE_PHOTO_URL = stringPreferencesKey("google_photo_url")
         private val KEY_CLOUD_SYNC_ENABLED = booleanPreferencesKey("cloud_sync_enabled")
         private val KEY_LAST_CLOUD_SYNC_TIME = androidx.datastore.preferences.core.longPreferencesKey("last_cloud_sync_time")
+        private val KEY_DAILY_NOTIFICATION_ENABLED = booleanPreferencesKey("daily_notification_enabled")
+        private val KEY_WEEKLY_NOTIFICATION_ENABLED = booleanPreferencesKey("weekly_notification_enabled")
     }
 
     val themeModeFlow: Flow<ThemeMode> = context.dataStore.data.map { prefs ->
@@ -150,6 +152,26 @@ class UserPreferences(private val context: Context) {
     suspend fun setLastCloudSyncTime(timeMs: Long) {
         context.dataStore.edit { prefs ->
             prefs[KEY_LAST_CLOUD_SYNC_TIME] = timeMs
+        }
+    }
+
+    val dailyNotificationEnabledFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[KEY_DAILY_NOTIFICATION_ENABLED] ?: true
+    }
+
+    val weeklyNotificationEnabledFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[KEY_WEEKLY_NOTIFICATION_ENABLED] ?: true
+    }
+
+    suspend fun setDailyNotificationEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_DAILY_NOTIFICATION_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setWeeklyNotificationEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_WEEKLY_NOTIFICATION_ENABLED] = enabled
         }
     }
 }

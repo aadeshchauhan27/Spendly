@@ -35,6 +35,12 @@ data class TransactionDateRange(
     val label: String
 )
 
+enum class TransactionSortOrder(val displayName: String) {
+    DATE("Date"),
+    LARGEST("Largest"),
+    SMALLEST("Smallest")
+}
+
 sealed interface TransactionsUiState {
     object Loading : TransactionsUiState
     data class Success(
@@ -44,6 +50,7 @@ sealed interface TransactionsUiState {
         val groupedTransactions: List<TransactionGroup>,
         val dateRange: TransactionDateRange? = null,
         val selectedDirection: TransactionDirection? = null,
+        val sortOrder: TransactionSortOrder = TransactionSortOrder.DATE,
         val isEmpty: Boolean
     ) : TransactionsUiState
     data class Error(val message: String) : TransactionsUiState
@@ -57,21 +64,24 @@ class TransactionsViewModel(
         val query: String,
         val category: String,
         val dateRange: TransactionDateRange?,
-        val direction: TransactionDirection?
+        val direction: TransactionDirection?,
+        val sortOrder: TransactionSortOrder
     )
 
     private val searchQueryFlow = MutableStateFlow("")
     private val selectedCategoryFlow = MutableStateFlow("All")
     private val dateRangeFlow = MutableStateFlow<TransactionDateRange?>(null)
     private val selectedDirectionFlow = MutableStateFlow<TransactionDirection?>(null)
+    private val sortOrderFlow = MutableStateFlow(TransactionSortOrder.DATE)
 
     private val filtersFlow = combine(
         searchQueryFlow,
         selectedCategoryFlow,
         dateRangeFlow,
-        selectedDirectionFlow
-    ) { query, category, dateRange, direction ->
-        FilterParams(query, category, dateRange, direction)
+        selectedDirectionFlow,
+        sortOrderFlow
+    ) { query, category, dateRange, direction, sortOrder ->
+        FilterParams(query, category, dateRange, direction, sortOrder)
     }
 
     val uiState: StateFlow<TransactionsUiState> = combine(
@@ -103,7 +113,33 @@ class TransactionsViewModel(
             matchesQuery && matchesCategory && matchesDate && matchesDirection
         }
 
-        val grouped = groupTransactionsByDay(filtered)
+        val grouped = when (filters.sortOrder) {
+            TransactionSortOrder.DATE -> {
+                groupTransactionsByDay(filtered)
+            }
+            TransactionSortOrder.LARGEST -> {
+                val sorted = filtered.sortedByDescending { it.amountPaise }
+                val totalPaise = sorted.filter { it.type == TransactionType.EXPENSE && it.status == TransactionStatus.COMPLETED }.sumOf { it.amountPaise }
+                if (sorted.isEmpty()) emptyList() else listOf(
+                    TransactionGroup(
+                        dateLabel = "Sorted by Largest (Highest first)",
+                        totalAmountFormatted = formatPaiseToRupees(totalPaise),
+                        transactions = sorted
+                    )
+                )
+            }
+            TransactionSortOrder.SMALLEST -> {
+                val sorted = filtered.sortedBy { it.amountPaise }
+                val totalPaise = sorted.filter { it.type == TransactionType.EXPENSE && it.status == TransactionStatus.COMPLETED }.sumOf { it.amountPaise }
+                if (sorted.isEmpty()) emptyList() else listOf(
+                    TransactionGroup(
+                        dateLabel = "Sorted by Smallest (Lowest first)",
+                        totalAmountFormatted = formatPaiseToRupees(totalPaise),
+                        transactions = sorted
+                    )
+                )
+            }
+        }
 
         TransactionsUiState.Success(
             searchQuery = filters.query,
@@ -112,6 +148,7 @@ class TransactionsViewModel(
             groupedTransactions = grouped,
             dateRange = filters.dateRange,
             selectedDirection = filters.direction,
+            sortOrder = filters.sortOrder,
             isEmpty = allTransactions.isEmpty()
         )
     }.stateIn(
@@ -122,6 +159,10 @@ class TransactionsViewModel(
 
     fun filterByDirection(direction: TransactionDirection?) {
         selectedDirectionFlow.value = direction
+    }
+
+    fun setSortOrder(order: TransactionSortOrder) {
+        sortOrderFlow.value = order
     }
 
     fun clearDirectionFilter() {
